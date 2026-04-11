@@ -198,6 +198,28 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      voter_rolls: {
+        Row: {
+          id: string
+          election_id: string
+          student_id: string
+          full_name: string
+          voter_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          election_id: string
+          student_id: string
+          full_name: string
+          voter_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          voter_id?: string | null
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           id: string
@@ -473,6 +495,18 @@ export interface Database {
       get_login_email: {
         Args: { p_identifier: string }
         Returns: string | null
+      }
+      get_voter_roll_count: {
+        Args: { p_election_id: string }
+        Returns: number
+      }
+      verify_voter: {
+        Args: {
+          p_election_id: string
+          p_student_id:  string
+          p_user_id:     string
+        }
+        Returns: { ok: boolean; error?: string; name?: string }
       }
     }
     Enums: Record<string, never>

@@ -6,7 +6,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import { Badge } from '@/components/shared/Badge'
 import { toast } from 'sonner'
-import { Loader2, CheckCircle2, ShieldX, ShieldCheck, X, FileText, Clock } from 'lucide-react'
+import { Loader2, CheckCircle2, ShieldX, ShieldCheck, X, FileText, Clock, KeyRound, AlertCircle } from 'lucide-react'
 import { useLiveCountdown } from '@/lib/hooks/useLiveCountdown'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/cn'
@@ -36,6 +36,11 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
   const [confirming, setConfirming] = useState(false)
   const [manifestoCandidate, setManifestoCandidate] = useState<CandidateWithProfile | null>(null)
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map())
+  // Voter roll verification state
+  const [studentId, setStudentId] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [verifyError, setVerifyError] = useState('')
+  const [justVerified, setJustVerified] = useState(false)
 
   const { data: election } = useQuery({
     queryKey: ['election', electionId],
@@ -88,7 +93,60 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
     },
   })
 
+  // Voter roll: does this election require voter-roll verification?
+  const { data: rollCount } = useQuery({
+    queryKey: ['voter-roll-count', electionId],
+    enabled: !!electionId,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase.rpc('get_voter_roll_count', { p_election_id: electionId })
+      return (data as number) ?? 0
+    },
+  })
+
+  // Is current user already verified (voter_id set in voter_rolls for this election)?
+  const { data: preVerified } = useQuery({
+    queryKey: ['voter-pre-verified', electionId, user?.id],
+    enabled: !!user && !!electionId,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('voter_rolls')
+        .select('id')
+        .eq('election_id', electionId)
+        .eq('voter_id', user!.id)
+        .maybeSingle()
+      return !!data
+    },
+  })
+
   const liveCountdown = useLiveCountdown(election?.ends_at)
+
+  // Voter roll logic
+  const hasVoterRoll = (rollCount ?? 0) > 0
+  const needsVerification = hasVoterRoll && !preVerified && !justVerified
+
+  async function handleVerify(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user || !studentId.trim()) return
+    setVerifying(true)
+    setVerifyError('')
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.rpc('verify_voter', {
+        p_election_id: electionId,
+        p_student_id:  studentId.toUpperCase().trim(),
+        p_user_id:     user.id,
+      })
+      if (error) { setVerifyError(error.message); return }
+      const result = data as { ok: boolean; error?: string; name?: string }
+      if (!result.ok) { setVerifyError(result.error ?? 'Verification failed'); return }
+      setJustVerified(true)
+      toast.success(`Verified as ${result.name}`)
+    } finally {
+      setVerifying(false)
+    }
+  }
 
   const { mutate: castVotes, isPending } = useMutation({
     mutationFn: async () => {
@@ -133,6 +191,76 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
     }
     return null
   })()
+
+  // ── Voter roll verification gate ────────────────────────────────────────────
+  if (needsVerification && rollCount !== undefined && preVerified !== undefined) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-10 space-y-6">
+        <div className="text-center">
+          <div className="w-14 h-14 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-4">
+            <KeyRound size={26} className="text-violet-600" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Verify your identity</h2>
+          <p className="text-slate-500 text-sm max-w-xs mx-auto">
+            This election requires a student ID verification before you can access the ballot.
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
+          {election && (
+            <div className="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-700">
+              {election.banner_url && (
+                <img src={election.banner_url} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
+              )}
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">{election.title}</p>
+                <p className="text-xs text-slate-400">{liveCountdown}</p>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleVerify} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Student ID
+              </label>
+              <input
+                value={studentId}
+                onChange={(e) => { setStudentId(e.target.value); setVerifyError('') }}
+                placeholder="e.g. CS/2020/001 or 10201234"
+                autoFocus
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-mono outline-none focus:ring-2 focus:ring-violet-500 uppercase placeholder:uppercase placeholder:opacity-40"
+              />
+              <p className="text-xs text-slate-400 mt-1.5">
+                Your profile name must match the name on the voter list. It is matched against:{' '}
+                <span className="font-medium text-slate-600 dark:text-slate-300">{user?.full_name}</span>
+              </p>
+            </div>
+
+            {verifyError && (
+              <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
+                <AlertCircle size={15} className="text-red-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700 dark:text-red-400">{verifyError}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={verifying || !studentId.trim()}
+              className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white font-semibold text-sm flex items-center justify-center gap-2 transition"
+            >
+              {verifying && <Loader2 size={15} className="animate-spin" />}
+              {verifying ? 'Verifying…' : 'Verify & Access Ballot'}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-xs text-slate-400">
+          If your student ID is not on the voter list or your name doesn&apos;t match, contact the election admin.
+        </p>
+      </div>
+    )
+  }
 
   if (eligibilityError) {
     return (

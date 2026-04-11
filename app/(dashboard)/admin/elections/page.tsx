@@ -10,7 +10,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { Badge } from '@/components/shared/Badge'
 import { Avatar } from '@/components/shared/Avatar'
-import { Plus, Loader2, Trash2, Users, ChevronDown, ChevronUp, Camera, Search, ShieldCheck } from 'lucide-react'
+import { Plus, Loader2, Trash2, Users, ChevronDown, ChevronUp, Camera, Search, ShieldCheck, ClipboardList, X } from 'lucide-react'
 import { formatEventDate } from '@/lib/utils/formatDate'
 import type { Election, CandidateWithProfile } from '@/types/app'
 
@@ -31,6 +31,198 @@ const blankCandidate = { position: '', manifesto: '', username: '' }
 type ResolvedProfile = {
   id: string; full_name: string; username: string; avatar_url: string | null
   department: string | null; level: string | null
+}
+
+// ── Voter Roll panel ──────────────────────────────────────────────────────────
+type VoterRollRow = { id: string; student_id: string; full_name: string; voter_id: string | null }
+
+function VoterRollPanel({ electionId }: { electionId: string }) {
+  const [rawText, setRawText] = useState('')
+  const [parsed, setParsed] = useState<{ student_id: string; full_name: string }[]>([])
+  const [parseError, setParseError] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [clearing, setClearing] = useState(false)
+
+  const { data: rolls = [], refetch } = useQuery<VoterRollRow[]>({
+    queryKey: ['voter-rolls', electionId],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('voter_rolls')
+        .select('id, student_id, full_name, voter_id')
+        .eq('election_id', electionId)
+        .order('created_at', { ascending: true })
+      return (data ?? []) as VoterRollRow[]
+    },
+  })
+
+  function parsePaste() {
+    setParseError('')
+    const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean)
+    const entries: { student_id: string; full_name: string }[] = []
+    const errors: string[] = []
+    lines.forEach((line, i) => {
+      // Support comma or tab as delimiter
+      const parts = line.split(/[,\t]/).map((p) => p.trim())
+      if (parts.length < 2 || !parts[0] || !parts[1]) {
+        errors.push(`Line ${i + 1}: expected "STUDENT_ID, Full Name" — got "${line}"`)
+        return
+      }
+      entries.push({ student_id: parts[0].toUpperCase(), full_name: parts.slice(1).join(' ') })
+    })
+    if (errors.length) { setParseError(errors.slice(0, 3).join('\n') + (errors.length > 3 ? `\n…and ${errors.length - 3} more` : '')); return }
+    setParsed(entries)
+  }
+
+  async function handleImport() {
+    if (!parsed.length) return
+    setImporting(true)
+    try {
+      const supabase = createClient()
+      const rows = parsed.map((p) => ({ election_id: electionId, student_id: p.student_id, full_name: p.full_name }))
+      const { error } = await supabase.from('voter_rolls').upsert(rows, { onConflict: 'election_id,student_id' })
+      if (error) { toast.error(error.message); return }
+      toast.success(`${rows.length} student ID${rows.length !== 1 ? 's' : ''} imported`)
+      setRawText('')
+      setParsed([])
+      refetch()
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  async function clearAll() {
+    if (!confirm(`Delete all ${rolls.length} voter roll entries for this election? This cannot be undone.`)) return
+    setClearing(true)
+    const supabase = createClient()
+    await supabase.from('voter_rolls').delete().eq('election_id', electionId)
+    toast.success('Voter roll cleared')
+    setClearing(false)
+    refetch()
+  }
+
+  async function deleteEntry(id: string) {
+    const supabase = createClient()
+    await supabase.from('voter_rolls').delete().eq('id', id)
+    refetch()
+  }
+
+  const usedCount = rolls.filter((r) => r.voter_id).length
+
+  return (
+    <div className="mt-3 border-t border-slate-100 dark:border-slate-700 pt-4 space-y-4">
+      {/* Stats */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl px-3 py-2">
+          <ClipboardList size={14} className="text-violet-500" />
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{rolls.length}</span>
+          <span className="text-xs text-slate-400">eligible students</span>
+        </div>
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 rounded-xl px-3 py-2">
+          <span className="text-sm font-semibold text-green-600">{usedCount}</span>
+          <span className="text-xs text-slate-400">verified / voted</span>
+        </div>
+        {rolls.length > 0 && (
+          <button
+            onClick={clearAll}
+            disabled={clearing}
+            className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600 font-medium ml-auto"
+          >
+            {clearing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {/* Paste import */}
+      <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 space-y-3">
+        <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+          Import voter list
+        </p>
+        <p className="text-xs text-slate-400">
+          One student per line: <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[10px]">STUDENT_ID, Full Name</code> or tab-separated.
+        </p>
+        <textarea
+          value={rawText}
+          onChange={(e) => { setRawText(e.target.value); setParsed([]); setParseError('') }}
+          placeholder={"CS/2020/001, John Kwame Doe\nCS/2020/002, Alice Mensah\n10201234, Bob Asante"}
+          rows={5}
+          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-violet-500 resize-y"
+        />
+        {parseError && (
+          <pre className="text-[10px] text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2 whitespace-pre-wrap">{parseError}</pre>
+        )}
+        {parsed.length > 0 && (
+          <div className="border border-green-200 dark:border-green-800 rounded-xl overflow-hidden">
+            <div className="px-3 py-2 bg-green-50 dark:bg-green-900/20 flex items-center justify-between">
+              <p className="text-xs font-semibold text-green-700 dark:text-green-400">
+                {parsed.length} entries ready to import
+              </p>
+              <button onClick={() => setParsed([])} className="text-slate-400 hover:text-slate-600">
+                <X size={12} />
+              </button>
+            </div>
+            <div className="max-h-36 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+              {parsed.slice(0, 50).map((p, i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-1.5">
+                  <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 shrink-0">{p.student_id}</span>
+                  <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{p.full_name}</span>
+                </div>
+              ))}
+              {parsed.length > 50 && (
+                <p className="text-[10px] text-slate-400 px-3 py-1.5">…and {parsed.length - 50} more</p>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={parsePaste}
+            disabled={!rawText.trim()}
+            className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium disabled:opacity-40 hover:bg-slate-300 dark:hover:bg-slate-600 transition"
+          >
+            Preview
+          </button>
+          {parsed.length > 0 && (
+            <button
+              type="button"
+              onClick={handleImport}
+              disabled={importing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium disabled:opacity-60 hover:bg-violet-500 transition"
+            >
+              {importing && <Loader2 size={11} className="animate-spin" />}
+              Import {parsed.length} entries
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Existing entries */}
+      {rolls.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Imported IDs ({rolls.length})</p>
+          <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
+            {rolls.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 px-3 py-2">
+                <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 shrink-0 w-24 truncate">{r.student_id}</span>
+                <span className="text-xs text-slate-700 dark:text-slate-300 flex-1 truncate">{r.full_name}</span>
+                {r.voter_id
+                  ? <span className="text-[10px] text-green-600 font-medium shrink-0">✓ verified</span>
+                  : <span className="text-[10px] text-slate-400 shrink-0">pending</span>
+                }
+                {!r.voter_id && (
+                  <button onClick={() => deleteEntry(r.id)} className="text-slate-300 hover:text-red-500 transition shrink-0">
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Candidate panel for a single election ──────────────────────────────────
@@ -297,6 +489,7 @@ export default function AdminElectionsPage() {
   const qc = useQueryClient()
   const [creating, setCreating] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [voterRollId, setVoterRollId] = useState<string | null>(null)
   const [selectedLevels, setSelectedLevels] = useState<string[]>([])
 
   const { data: elections } = useQuery({
@@ -525,6 +718,14 @@ export default function AdminElectionsPage() {
                     Candidates
                     {expandedId === el.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   </button>
+                  <button
+                    onClick={() => setVoterRollId(voterRollId === el.id ? null : el.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition"
+                  >
+                    <ClipboardList size={13} />
+                    Voter Roll
+                    {voterRollId === el.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
                   {el.status === 'draft' && (
                     <button
                       onClick={() => changeStatus({ id: el.id, status: 'active' })}
@@ -550,6 +751,7 @@ export default function AdminElectionsPage() {
                 </div>
               </div>
               {expandedId === el.id && <CandidatePanel electionId={el.id} />}
+              {voterRollId === el.id && <VoterRollPanel electionId={el.id} />}
             </div>
           )
         })}
