@@ -2,6 +2,7 @@
 import { use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
+import { useUser } from '@/lib/hooks/useUser'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Avatar } from '@/components/shared/Avatar'
 import { Trophy, Lock } from 'lucide-react'
@@ -11,6 +12,8 @@ const COLORS = ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe']
 
 export default function ElectionResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { user } = useUser()
+  const isAdmin = !!(user && ['admin', 'super_admin'].includes((user as unknown as { role?: string }).role ?? ''))
 
   const { data: election } = useQuery({
     queryKey: ['election', id],
@@ -36,7 +39,7 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
 
   const positions = [...new Set(candidates?.map((c) => c.position) ?? [])]
 
-  if (election && election.status !== 'closed') {
+  if (election && election.status !== 'closed' && !isAdmin) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 flex flex-col items-center gap-4 text-center">
         <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
@@ -54,7 +57,9 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
       <div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">{election?.title} — Results</h1>
-        <p className="text-slate-500 text-sm mt-1">Final vote count</p>
+        <p className="text-slate-500 text-sm mt-1">
+          {election?.status === 'closed' ? 'Final vote count' : 'Live preview (admin only)'}
+        </p>
       </div>
 
       {positions.map((position) => {

@@ -8,6 +8,7 @@ import { Vote, Clock, ChevronRight, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils/cn'
 import type { Election } from '@/types/app'
+import { useLiveCountdown } from '@/lib/hooks/useLiveCountdown'
 
 type ElectionWithEligibility = Election & {
   eligible_levels: string[] | null
@@ -93,6 +94,7 @@ function ElectionCard({ election }: { election: ElectionWithEligibility }) {
   const isActive = election.status === 'active'
   const isClosed = election.status === 'closed'
   const isUpcoming = election.status === 'draft'
+  const liveCountdown = useLiveCountdown(isActive ? election.ends_at : undefined)
 
   return (
     <Link
@@ -135,7 +137,7 @@ function ElectionCard({ election }: { election: ElectionWithEligibility }) {
         <div className="flex items-center gap-1.5 mt-3 text-xs text-slate-400">
           <Clock size={12} />
           {isActive
-            ? countdown(election.ends_at)
+            ? liveCountdown
             : isClosed
             ? `Ended ${formatEventDate(election.ends_at)}`
             : `Opens ${formatEventDate(election.starts_at)}`}

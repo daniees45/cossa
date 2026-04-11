@@ -1,15 +1,16 @@
 'use client'
-import { use } from 'react'
+import { use, useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import { Badge } from '@/components/shared/Badge'
 import { toast } from 'sonner'
-import { Loader2, CheckCircle2, ShieldX, ShieldCheck } from 'lucide-react'
-import { countdown } from '@/lib/utils/formatDate'
-import { useState } from 'react'
+import { Loader2, CheckCircle2, ShieldX, ShieldCheck, X, FileText, Clock } from 'lucide-react'
+import { useLiveCountdown } from '@/lib/hooks/useLiveCountdown'
 import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils/cn'
+import Link from 'next/link'
 import type { CandidateWithProfile, Election } from '@/types/app'
 
 type ElectionWithEligibility = Election & {
@@ -17,13 +18,24 @@ type ElectionWithEligibility = Election & {
   require_index_number: boolean
 }
 
+type VoteReceiptItem = {
+  candidate_id: string
+  candidate: {
+    position: string
+    photo_url: string | null
+    profile: { full_name: string; avatar_url: string | null }
+  }
+}
+
 export default function VoteBallotPage({ params }: { params: Promise<{ electionId: string }> }) {
   const { electionId } = use(params)
   const { user } = useUser()
   const router = useRouter()
   const qc = useQueryClient()
-  const [selected, setSelected] = useState<Record<string, string>>({}) // position → candidateId
+  const [selected, setSelected] = useState<Record<string, string>>({})
   const [confirming, setConfirming] = useState(false)
+  const [manifestoCandidate, setManifestoCandidate] = useState<CandidateWithProfile | null>(null)
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map())
 
   const { data: election } = useQuery({
     queryKey: ['election', electionId],
@@ -61,6 +73,23 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
     },
   })
 
+  // Vote receipt — requires migration 010 (votes_select_own policy)
+  const { data: myVotes } = useQuery({
+    queryKey: ['my-votes', electionId, user?.id],
+    enabled: !!user && hasVoted === true,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('votes')
+        .select('candidate_id, candidate:candidates!candidate_id(position, photo_url, profile:profiles!user_id(full_name, avatar_url))')
+        .eq('election_id', electionId)
+        .eq('voter_id', user!.id)
+      return (data ?? []) as unknown as VoteReceiptItem[]
+    },
+  })
+
+  const liveCountdown = useLiveCountdown(election?.ends_at)
+
   const { mutate: castVotes, isPending } = useMutation({
     mutationFn: async () => {
       const supabase = createClient()
@@ -85,16 +114,18 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
 
   // Group candidates by position
   const positions = [...new Set(candidates?.map((c) => c.position) ?? [])]
+  const totalPositions = positions.length
+  const selectedCount = Object.keys(selected).length
 
   // Eligibility check
   const eligibilityError = (() => {
     if (!election || !user) return null
     const e = election as ElectionWithEligibility
-    if (e.require_index_number && !(user as never as { index_number: string | null }).index_number) {
+    if (e.require_index_number && !(user as unknown as { index_number: string | null }).index_number) {
       return 'You must add your student index number to your profile before voting in this election.'
     }
     if (e.eligible_levels && e.eligible_levels.length > 0) {
-      const userLevel = (user as never as { level: string | null }).level
+      const userLevel = (user as unknown as { level: string | null }).level
       if (!userLevel || !e.eligible_levels.includes(userLevel)) {
         const readable = e.eligible_levels.map((l) => l === 'postgrad' ? 'Postgrad' : `${l} Level`).join(', ')
         return `This election is restricted to ${readable} students. Your profile level does not match.`
@@ -130,28 +161,103 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
 
   if (hasVoted) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-16 text-center">
-        <CheckCircle2 size={48} className="text-green-500 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">You&apos;ve already voted</h2>
-        <p className="text-slate-500 text-sm">Your vote has been recorded. Results will be published when the election closes.</p>
+      <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
+        <div className="text-center">
+          <CheckCircle2 size={52} className="text-green-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">You&apos;ve already voted</h2>
+          <p className="text-slate-500 text-sm">Your vote has been securely recorded.</p>
+        </div>
+
+        {myVotes && myVotes.length > 0 && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Your vote receipt</p>
+              <p className="text-xs text-slate-400 mt-0.5">A summary of how you voted in this election</p>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-700">
+              {myVotes.map((v) => (
+                <div key={v.candidate_id} className="flex items-center gap-3 px-4 py-3">
+                  <Avatar
+                    src={v.candidate.photo_url ?? v.candidate.profile.avatar_url}
+                    name={v.candidate.profile.full_name}
+                    size="sm"
+                  />
+                  <div>
+                    <p className="text-xs text-slate-500">{v.candidate.position}</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{v.candidate.profile.full_name}</p>
+                  </div>
+                  <CheckCircle2 size={16} className="text-green-500 ml-auto shrink-0" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <Link
+            href="/vote"
+            className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium text-slate-700 dark:text-slate-300 text-center hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+          >
+            Back to Elections
+          </Link>
+          <Link
+            href={`/vote/results/${electionId}`}
+            className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold text-center transition"
+          >
+            View Results
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-lg mx-auto px-4 pb-10 space-y-6">
+      {/* Election header */}
       {election && (
-        <div>
+        <div className="pt-6">
           {election.banner_url && (
             <img src={election.banner_url} alt="" className="w-full h-40 object-cover rounded-2xl mb-4" />
           )}
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">{election.title}</h1>
-          <p className="text-sm text-slate-500 mt-1">{countdown(election.ends_at)}</p>
+          {election.description && (
+            <p className="text-sm text-slate-500 mt-1">{election.description}</p>
+          )}
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-400">
+            <Clock size={12} />
+            {liveCountdown}
+          </div>
         </div>
       )}
 
+      {/* Position navigation pills — shown when there are multiple positions */}
+      {positions.length > 1 && (
+        <div className="sticky top-14 z-20 -mx-4 px-4 py-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-100 dark:border-slate-800">
+          <div className="flex gap-2 overflow-x-auto pb-0.5">
+            {positions.map((p) => (
+              <button
+                key={p}
+                onClick={() => sectionRefs.current.get(p)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className={cn(
+                  'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition',
+                  selected[p]
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                )}
+              >
+                {selected[p] ? '✓ ' : ''}{p}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Positions */}
       {positions.map((position) => (
-        <section key={position}>
+        <section
+          key={position}
+          ref={(el) => { if (el) sectionRefs.current.set(position, el) }}
+        >
           <h2 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">
             {position}
           </h2>
@@ -162,11 +268,12 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                 <button
                   key={candidate.id}
                   onClick={() => setSelected({ ...selected, [position]: candidate.id })}
-                  className={`w-full text-left flex items-center gap-4 p-4 rounded-2xl border-2 transition ${
+                  className={cn(
+                    'w-full text-left flex items-start gap-4 p-4 rounded-2xl border-2 transition',
                     isSelected
                       ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
                       : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-violet-300'
-                  }`}
+                  )}
                 >
                   <Avatar
                     src={candidate.photo_url ?? candidate.profile.avatar_url}
@@ -175,11 +282,22 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 dark:text-white">{candidate.profile.full_name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{candidate.manifesto}</p>
-                    <Badge variant="info" className="mt-2">Level {candidate.profile.level}</Badge>
+                    <Badge variant="info" className="mt-1 mb-2">Level {candidate.profile.level}</Badge>
+                    {candidate.manifesto && (
+                      <p className="text-xs text-slate-500 line-clamp-2">{candidate.manifesto}</p>
+                    )}
+                    {candidate.manifesto && candidate.manifesto.length > 100 && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setManifestoCandidate(candidate) }}
+                        className="flex items-center gap-1 mt-1.5 text-xs text-violet-600 hover:text-violet-500 font-medium"
+                      >
+                        <FileText size={11} /> Read full manifesto
+                      </button>
+                    )}
                   </div>
                   {isSelected && (
-                    <CheckCircle2 size={22} className="text-violet-600 shrink-0" />
+                    <CheckCircle2 size={22} className="text-violet-600 shrink-0 mt-0.5" />
                   )}
                 </button>
               )
@@ -188,16 +306,41 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
         </section>
       ))}
 
-      {Object.keys(selected).length > 0 && !confirming && (
-        <button
-          onClick={() => setConfirming(true)}
-          className="w-full py-3.5 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-semibold transition"
-        >
-          Review & Cast Vote
-        </button>
+      {/* Progress bar + submit */}
+      {totalPositions > 0 && (
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs text-slate-500">{selectedCount} of {totalPositions} positions selected</p>
+              {selectedCount === totalPositions && (
+                <p className="text-xs text-green-600 font-medium">Ready to submit!</p>
+              )}
+            </div>
+            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+              <div
+                className={cn(
+                  'h-2 rounded-full transition-all',
+                  selectedCount === totalPositions ? 'bg-green-500' : 'bg-violet-500'
+                )}
+                style={{ width: `${totalPositions ? (selectedCount / totalPositions) * 100 : 0}%` }}
+              />
+            </div>
+          </div>
+
+          {selectedCount > 0 && !confirming && (
+            <button
+              onClick={() => setConfirming(true)}
+              className="w-full py-3.5 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-semibold transition"
+            >
+              {selectedCount < totalPositions
+                ? `Continue (${selectedCount}/${totalPositions} selected)`
+                : 'Review & Cast Vote'}
+            </button>
+          )}
+        </div>
       )}
 
-      {/* Confirmation dialog */}
+      {/* Confirmation modal */}
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 px-4 pb-6 md:pb-0">
           <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl p-6 space-y-4 shadow-2xl">
@@ -231,6 +374,54 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
               >
                 {isPending && <Loader2 size={14} className="animate-spin" />}
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full manifesto modal */}
+      {manifestoCandidate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+              <Avatar
+                src={manifestoCandidate.photo_url ?? manifestoCandidate.profile.avatar_url}
+                name={manifestoCandidate.profile.full_name}
+                size="md"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-900 dark:text-white">{manifestoCandidate.profile.full_name}</p>
+                <p className="text-xs text-slate-500">{manifestoCandidate.position}</p>
+              </div>
+              <button
+                onClick={() => setManifestoCandidate(null)}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 transition"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="px-5 py-4 max-h-80 overflow-y-auto">
+              <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
+                {manifestoCandidate.manifesto}
+              </p>
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-700">
+              <button
+                onClick={() => {
+                  setSelected({ ...selected, [manifestoCandidate.position]: manifestoCandidate.id })
+                  setManifestoCandidate(null)
+                }}
+                className={cn(
+                  'w-full py-2.5 rounded-xl text-sm font-semibold transition',
+                  selected[manifestoCandidate.position] === manifestoCandidate.id
+                    ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 cursor-default'
+                    : 'bg-violet-600 hover:bg-violet-500 text-white'
+                )}
+              >
+                {selected[manifestoCandidate.position] === manifestoCandidate.id
+                  ? '✓ Selected'
+                  : `Vote for ${manifestoCandidate.profile.full_name.split(' ')[0]}`}
               </button>
             </div>
           </div>
