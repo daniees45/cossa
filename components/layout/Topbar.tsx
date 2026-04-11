@@ -1,0 +1,137 @@
+'use client'
+import Link from 'next/link'
+import { Bell, Search } from 'lucide-react'
+import { useNotificationStore } from '@/lib/stores/notificationStore'
+import { useUser } from '@/lib/hooks/useUser'
+import { getInitials } from '@/lib/utils/uploadFile'
+import { cn } from '@/lib/utils/cn'
+import { useState, useEffect, useRef } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import { timeAgo } from '@/lib/utils/formatDate'
+import type { Notification } from '@/types/app'
+
+export function Topbar() {
+  const { unreadCount, notifications, markAllRead, setNotifications } = useNotificationStore()
+  const { user } = useUser()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+
+  // Load notifications on mount
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+    supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (data) setNotifications(data as Notification[])
+      })
+  }, [user, setNotifications])
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  async function handleMarkAllRead() {
+    markAllRead()
+    if (!user) return
+    const supabase = createClient()
+    await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', user.id)
+  }
+
+  return (
+    <header className="sticky top-0 z-40 flex items-center h-14 px-4 md:px-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 gap-3">
+      {/* COSSA logo - mobile only */}
+      <div className="md:hidden flex items-center gap-2 mr-2">
+        <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
+          <span className="text-white font-bold text-xs">C</span>
+        </div>
+        <span className="font-bold text-slate-900 dark:text-white text-sm">COSSA</span>
+      </div>
+
+      {/* Search */}
+      <div className="flex-1 max-w-xs hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2">
+        <Search size={15} className="text-slate-400 shrink-0" />
+        <input
+          type="text"
+          placeholder="Search..."
+          className="bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 outline-none w-full"
+        />
+      </div>
+
+      <div className="ml-auto flex items-center gap-3">
+        {/* Notification Bell */}
+        <div className="relative" ref={ref}>
+          <button
+            onClick={() => setOpen(!open)}
+            className="relative p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          >
+            <Bell size={20} className="text-slate-600 dark:text-slate-300" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {open && (
+            <div className="absolute right-0 top-12 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</p>
+                {unreadCount > 0 && (
+                  <button onClick={handleMarkAllRead} className="text-xs text-violet-600 hover:underline">
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                {notifications.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-8">No notifications yet</p>
+                )}
+                {notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    onClick={() => { if (n.link) router.push(n.link); setOpen(false) }}
+                    className={cn(
+                      'flex gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition',
+                      !n.read && 'bg-violet-50 dark:bg-violet-900/10'
+                    )}
+                  >
+                    <div className="w-2 h-2 rounded-full bg-violet-500 mt-2 shrink-0 opacity-0 data-[unread=true]:opacity-100" data-unread={!n.read} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{n.title}</p>
+                      <p className="text-xs text-slate-500 mt-0.5 truncate">{n.body}</p>
+                      <p className="text-xs text-slate-400 mt-1">{timeAgo(n.created_at)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Avatar */}
+        {user && (
+          <Link href={`/profile/${user.username}`} className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden">
+            {user.avatar_url
+              ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+              : getInitials(user.full_name)}
+          </Link>
+        )}
+      </div>
+    </header>
+  )
+}
