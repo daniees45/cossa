@@ -121,7 +121,6 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
             .eq('id', payload.new.id)
             .single()
           if (msg) {
-            // Deduplicate — may already exist if this client sent it
             setMessages((prev) =>
               prev.find((m) => m.id === (msg as { id: string }).id)
                 ? prev
@@ -237,21 +236,16 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     }
 
     const supabase = createClient()
-    const { data: inserted } = await supabase
-      .from('messages')
-      .insert({ channel_id: channelId, sender_id: user.id, content: text.trim() || ' ', media_url: mediaUrl })
-      .select('*, sender:profiles!sender_id(*)')
-      .single()
+    // Just insert — the realtime channel subscription fires for the sender too,
+    // so all participants (including the sender) see the message simultaneously.
+    await supabase.from('messages').insert({
+      channel_id: channelId,
+      sender_id: user.id,
+      content: text.trim() || ' ',
+      media_url: mediaUrl,
+    })
     setText('')
     setSending(false)
-    if (inserted) {
-      setMessages((prev) =>
-        prev.find((m) => m.id === (inserted as { id: string }).id)
-          ? prev
-          : [...prev, inserted as unknown as MessageWithSender]
-      )
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-    }
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {

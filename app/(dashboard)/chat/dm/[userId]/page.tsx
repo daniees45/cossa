@@ -176,30 +176,48 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       })
 
     // Realtime subscriptions
+    // We subscribe to both directions of the conversation so BOTH sender and
+    // receiver see messages the instant they are inserted.
+    async function handleNewDmMessage(payload: { new: Record<string, unknown> }) {
+      if (!user) return
+      const row = payload.new as { id: string; sender_id: string; receiver_id: string }
+      // Only care about messages in THIS conversation
+      const inConversation =
+        (row.sender_id === user.id && row.receiver_id === userId) ||
+        (row.sender_id === userId && row.receiver_id === user.id)
+      if (!inConversation) return
+
+      const { data: msg } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!sender_id(*)')
+        .eq('id', row.id)
+        .single()
+      if (!msg) return
+
+      setMessages((prev) =>
+        prev.find((m) => m.id === row.id)
+          ? prev
+          : [...prev, msg as unknown as MessageWithSender]
+      )
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+
+      // If we are the receiver, mark as read immediately
+      if (row.receiver_id === user.id) {
+        await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', row.id)
+      }
+    }
+
     const dmChannel = supabase
       .channel(`dm-${[user.id, userId].sort().join('-')}`)
       .on(
         'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${user.id}` },
+        handleNewDmMessage,
+      )
+      .on(
+        'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` },
-        async (payload) => {
-          if (payload.new.sender_id !== userId) return
-          const { data: msg } = await supabase
-            .from('messages')
-            .select('*, sender:profiles!sender_id(*)')
-            .eq('id', payload.new.id)
-            .single()
-          if (msg) {
-            // Deduplicate — may already exist if this client sent it
-            setMessages((prev) =>
-              prev.find((m) => m.id === (msg as { id: string }).id)
-                ? prev
-                : [...prev, msg as unknown as MessageWithSender]
-            )
-            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-            // Mark as read immediately since we're in the conversation
-            await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', payload.new.id)
-          }
-        },
+        handleNewDmMessage,
       )
       .on(
         'postgres_changes',
@@ -318,19 +336,14 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       } catch { /* fall back to plaintext */ }
     }
     setText('')
-    const { data: inserted } = await supabase
-      .from('messages')
-      .insert({ sender_id: user.id, receiver_id: userId, content, media_url: mediaUrl })
-      .select('*, sender:profiles!sender_id(*)')
-      .single()
-    if (inserted) {
-      setMessages((prev) =>
-        prev.find((m) => m.id === (inserted as { id: string }).id)
-          ? prev
-          : [...prev, inserted as unknown as MessageWithSender]
-      )
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-    }
+    // Just insert — the realtime subscription above fires for the sender too
+    // (via sender_id filter), so both parties see the message simultaneously.
+    await supabase.from('messages').insert({
+      sender_id: user.id,
+      receiver_id: userId,
+      content,
+      media_url: mediaUrl,
+    })
   }
 
   // ── File selection ────────────────────────────────────────────────────────
