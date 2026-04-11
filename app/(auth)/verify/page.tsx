@@ -1,7 +1,36 @@
+'use client'
+import { useState } from 'react'
 import Link from 'next/link'
-import { MailCheck } from 'lucide-react'
+import { MailCheck, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
 export default function VerifyPage() {
+  const [resending, setResending] = useState(false)
+  const [resent, setResent] = useState(false)
+
+  async function handleResend() {
+    const email = typeof window !== 'undefined' ? sessionStorage.getItem('cossa_pending_email') : null
+    if (!email) {
+      toast.error('Could not find your email. Please register again.')
+      return
+    }
+    setResending(true)
+    const supabase = createClient()
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/api/auth/callback` },
+    })
+    setResending(false)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    setResent(true)
+    toast.success('Verification email resent!')
+  }
+
   return (
     <div className="w-full max-w-sm bg-slate-800/60 backdrop-blur border border-slate-700 rounded-2xl p-8 shadow-2xl text-center">
       <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-violet-600/20 mb-4">
@@ -17,6 +46,15 @@ export default function VerifyPage() {
       >
         Back to Login
       </Link>
+      <button
+        onClick={handleResend}
+        disabled={resending || resent}
+        className="mt-3 w-full py-3 rounded-xl border border-slate-600 text-slate-300 hover:text-white hover:border-slate-400 transition text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+        {resending && <Loader2 size={14} className="animate-spin" />}
+        {resent ? 'Email resent!' : 'Resend verification email'}
+      </button>
     </div>
   )
 }
+

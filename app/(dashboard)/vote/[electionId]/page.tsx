@@ -1,4 +1,5 @@
 'use client'
+import { use } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
@@ -16,8 +17,8 @@ type ElectionWithEligibility = Election & {
   require_index_number: boolean
 }
 
-export default function VoteBallotPage({ params }: { params: { electionId: string } }) {
-  const { electionId } = params
+export default function VoteBallotPage({ params }: { params: Promise<{ electionId: string }> }) {
+  const { electionId } = use(params)
   const { user } = useUser()
   const router = useRouter()
   const qc = useQueryClient()

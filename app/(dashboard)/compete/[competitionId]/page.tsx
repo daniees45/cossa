@@ -1,4 +1,5 @@
 'use client'
+import { use, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
@@ -21,8 +22,8 @@ const submitSchema = z.object({
 })
 type SubmitForm = z.infer<typeof submitSchema>
 
-export default function CompetitionDetailPage({ params }: { params: { competitionId: string } }) {
-  const { competitionId } = params
+export default function CompetitionDetailPage({ params }: { params: Promise<{ competitionId: string }> }) {
+  const { competitionId } = use(params)
   const { user } = useUser()
   const qc = useQueryClient()
   const [tab, setTab] = useState<'details' | 'leaderboard' | 'submit'>('details')
@@ -55,8 +56,21 @@ export default function CompetitionDetailPage({ params }: { params: { competitio
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<SubmitForm>({ resolver: zodResolver(submitSchema) })
+
+  // Pre-populate form when existing submission is loaded
+  useEffect(() => {
+    if (mySubmission) {
+      reset({
+        team_name: mySubmission.team_name ?? '',
+        repo_url: mySubmission.repo_url ?? '',
+        demo_url: mySubmission.demo_url ?? '',
+        description: mySubmission.description ?? '',
+      })
+    }
+  }, [mySubmission, reset])
 
   const { mutate: submit } = useMutation({
     mutationFn: async (data: SubmitForm) => {
@@ -199,7 +213,6 @@ export default function CompetitionDetailPage({ params }: { params: { competitio
             <label className="block text-sm text-slate-700 dark:text-slate-300 mb-1">Team Name (optional)</label>
             <input
               {...register('team_name')}
-              defaultValue={mySubmission?.team_name ?? ''}
               placeholder="Team Alpha"
               className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-violet-500"
             />
@@ -208,7 +221,6 @@ export default function CompetitionDetailPage({ params }: { params: { competitio
             <label className="block text-sm text-slate-700 dark:text-slate-300 mb-1">Repository URL</label>
             <input
               {...register('repo_url')}
-              defaultValue={mySubmission?.repo_url ?? ''}
               placeholder="https://github.com/…"
               className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-violet-500"
             />
@@ -218,7 +230,6 @@ export default function CompetitionDetailPage({ params }: { params: { competitio
             <label className="block text-sm text-slate-700 dark:text-slate-300 mb-1">Demo URL (optional)</label>
             <input
               {...register('demo_url')}
-              defaultValue={mySubmission?.demo_url ?? ''}
               placeholder="https://your-demo.vercel.app"
               className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-violet-500"
             />
@@ -230,7 +241,6 @@ export default function CompetitionDetailPage({ params }: { params: { competitio
             </label>
             <textarea
               {...register('description')}
-              defaultValue={mySubmission?.description ?? ''}
               rows={4}
               placeholder="Describe your project…"
               className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-violet-500 resize-none"

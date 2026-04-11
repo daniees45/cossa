@@ -46,8 +46,10 @@ export default function RegisterPage() {
         data: {
           full_name: data.full_name,
           username: data.username,
+          index_number: data.index_number,
+          level: data.level,
         },
-        emailRedirectTo: `${window.location.origin}/verify`,
+        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
       },
     })
     if (error) {
@@ -55,16 +57,8 @@ export default function RegisterPage() {
       return
     }
 
-    // Update profile with extra data after signup
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from('profiles').update({
-        index_number: data.index_number,
-        level: data.level,
-      }).eq('id', user.id)
-    }
-
     toast.success('Check your email to verify your account!')
+    sessionStorage.setItem('cossa_pending_email', data.email)
     router.push('/verify')
   }
 

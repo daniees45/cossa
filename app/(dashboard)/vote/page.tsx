@@ -6,6 +6,7 @@ import { Badge } from '@/components/shared/Badge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Vote, Clock, ChevronRight, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
+import { cn } from '@/lib/utils/cn'
 import type { Election } from '@/types/app'
 
 type ElectionWithEligibility = Election & {
@@ -21,13 +22,13 @@ export default function VotePage() {
       const { data } = await supabase
         .from('elections')
         .select('*')
-        .neq('status', 'draft')
         .order('starts_at', { ascending: false })
       return (data ?? []) as ElectionWithEligibility[]
     },
   })
 
   const active = elections?.filter((e) => e.status === 'active') ?? []
+  const upcoming = elections?.filter((e) => e.status === 'draft') ?? []
   const closed = elections?.filter((e) => e.status === 'closed') ?? []
 
   return (
@@ -51,6 +52,16 @@ export default function VotePage() {
               <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Active Now</h2>
               <div className="space-y-3">
                 {active.map((e) => <ElectionCard key={e.id} election={e} />)}
+              </div>
+            </section>
+          )}
+
+          {/* Upcoming elections */}
+          {upcoming.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Coming Soon</h2>
+              <div className="space-y-3">
+                {upcoming.map((e) => <ElectionCard key={e.id} election={e} />)}
               </div>
             </section>
           )}
@@ -81,11 +92,15 @@ export default function VotePage() {
 function ElectionCard({ election }: { election: ElectionWithEligibility }) {
   const isActive = election.status === 'active'
   const isClosed = election.status === 'closed'
+  const isUpcoming = election.status === 'draft'
 
   return (
     <Link
-      href={isClosed ? `/vote/results/${election.id}` : `/vote/${election.id}`}
-      className="block bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:border-violet-300 dark:hover:border-violet-700 transition group"
+      href={isClosed ? `/vote/results/${election.id}` : isUpcoming ? '#' : `/vote/${election.id}`}
+      className={cn(
+        'block bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden transition group',
+        isUpcoming ? 'opacity-70 cursor-default' : 'hover:border-violet-300 dark:hover:border-violet-700'
+      )}
     >
       {election.banner_url && (
         <div className="h-28 overflow-hidden">
@@ -121,7 +136,9 @@ function ElectionCard({ election }: { election: ElectionWithEligibility }) {
           <Clock size={12} />
           {isActive
             ? countdown(election.ends_at)
-            : `Ended ${formatEventDate(election.ends_at)}`}
+            : isClosed
+            ? `Ended ${formatEventDate(election.ends_at)}`
+            : `Opens ${formatEventDate(election.starts_at)}`}
         </div>
       </div>
     </Link>

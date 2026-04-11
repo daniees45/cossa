@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
@@ -10,8 +10,8 @@ import { timeAgo } from '@/lib/utils/formatDate'
 import type { MessageWithSender, Profile } from '@/types/app'
 import Link from 'next/link'
 
-export default function DMPage({ params }: { params: { userId: string } }) {
-  const { userId } = params
+export default function DMPage({ params }: { params: Promise<{ userId: string }> }) {
+  const { userId } = use(params)
   const { user } = useUser()
   const [messages, setMessages] = useState<MessageWithSender[]>([])
   const [text, setText] = useState('')

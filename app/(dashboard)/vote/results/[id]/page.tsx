@@ -1,15 +1,16 @@
 'use client'
+import { use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Avatar } from '@/components/shared/Avatar'
-import { Trophy } from 'lucide-react'
+import { Trophy, Lock } from 'lucide-react'
 import type { CandidateWithProfile, Election } from '@/types/app'
 
 const COLORS = ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe']
 
-export default function ElectionResultsPage({ params }: { params: { id: string } }) {
-  const { id } = params
+export default function ElectionResultsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
 
   const { data: election } = useQuery({
     queryKey: ['election', id],
@@ -34,6 +35,20 @@ export default function ElectionResultsPage({ params }: { params: { id: string }
   })
 
   const positions = [...new Set(candidates?.map((c) => c.position) ?? [])]
+
+  if (election && election.status !== 'closed') {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-20 flex flex-col items-center gap-4 text-center">
+        <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+          <Lock size={24} className="text-amber-500" />
+        </div>
+        <h1 className="text-lg font-bold text-slate-900 dark:text-white">Results Not Available Yet</h1>
+        <p className="text-slate-500 text-sm max-w-xs">
+          Results will be published once this election is officially closed.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">

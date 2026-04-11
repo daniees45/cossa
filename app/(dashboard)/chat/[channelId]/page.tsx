@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
@@ -10,13 +10,16 @@ import { timeAgo } from '@/lib/utils/formatDate'
 import type { Channel, MessageWithSender } from '@/types/app'
 import Link from 'next/link'
 
-export default function ChannelPage({ params }: { params: { channelId: string } }) {
-  const { channelId } = params
+export default function ChannelPage({ params }: { params: Promise<{ channelId: string }> }) {
+  const { channelId } = use(params)
   const { user } = useUser()
   const [messages, setMessages] = useState<MessageWithSender[]>([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const { data: channel } = useQuery({
     queryKey: ['channel', channelId],
@@ -37,7 +40,10 @@ export default function ChannelPage({ params }: { params: { channelId: string } 
       .order('created_at', { ascending: true })
       .limit(50)
       .then(({ data }) => {
-        if (data) setMessages(data as MessageWithSender[])
+        if (data) {
+          setMessages(data as MessageWithSender[])
+          setHasMore(data.length === 50)
+        }
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       })
 
@@ -68,6 +74,31 @@ export default function ChannelPage({ params }: { params: { channelId: string } 
 
     return () => { supabase.removeChannel(channel) }
   }, [channelId])
+
+  async function loadOlderMessages() {
+    if (!messages.length || loadingOlder) return
+    setLoadingOlder(true)
+    const oldest = messages[0].created_at
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('messages')
+      .select('*, sender:profiles!sender_id(*)')
+      .eq('channel_id', channelId)
+      .lt('created_at', oldest)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    setLoadingOlder(false)
+    if (!data || data.length === 0) { setHasMore(false); return }
+    const older = [...data].reverse() as MessageWithSender[]
+    // Preserve scroll position
+    const container = scrollRef.current
+    const prevHeight = container?.scrollHeight ?? 0
+    setMessages((prev) => [...older, ...prev])
+    setHasMore(data.length === 50)
+    requestAnimationFrame(() => {
+      if (container) container.scrollTop = container.scrollHeight - prevHeight
+    })
+  }
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
@@ -102,7 +133,18 @@ export default function ChannelPage({ params }: { params: { channelId: string } 
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+        {hasMore && (
+          <div className="flex justify-center pb-2">
+            <button
+              onClick={loadOlderMessages}
+              disabled={loadingOlder}
+              className="text-xs text-violet-500 hover:text-violet-400 font-medium disabled:opacity-50"
+            >
+              {loadingOlder ? 'Loading…' : 'Load older messages'}
+            </button>
+          </div>
+        )}
         {messages.map((msg, i) => {
           const isOwn = msg.sender_id === user?.id
           const prevMsg = messages[i - 1]
