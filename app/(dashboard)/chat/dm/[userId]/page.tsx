@@ -542,7 +542,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 ) : (
                   <div
                     className={cn(
-                      'rounded-2xl text-sm',
+                      'rounded-2xl text-sm inline-block',
                       isOwn
                         ? 'bg-violet-600 text-white rounded-tr-sm'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-sm',
