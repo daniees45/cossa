@@ -189,7 +189,12 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
             .eq('id', payload.new.id)
             .single()
           if (msg) {
-            setMessages((prev) => [...prev, msg as unknown as MessageWithSender])
+            // Deduplicate — may already exist if this client sent it
+            setMessages((prev) =>
+              prev.find((m) => m.id === (msg as { id: string }).id)
+                ? prev
+                : [...prev, msg as unknown as MessageWithSender]
+            )
             setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
             // Mark as read immediately since we're in the conversation
             await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', payload.new.id)
@@ -313,12 +318,19 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       } catch { /* fall back to plaintext */ }
     }
     setText('')
-    await supabase.from('messages').insert({
-      sender_id: user.id,
-      receiver_id: userId,
-      content,
-      media_url: mediaUrl,
-    })
+    const { data: inserted } = await supabase
+      .from('messages')
+      .insert({ sender_id: user.id, receiver_id: userId, content, media_url: mediaUrl })
+      .select('*, sender:profiles!sender_id(*)')
+      .single()
+    if (inserted) {
+      setMessages((prev) =>
+        prev.find((m) => m.id === (inserted as { id: string }).id)
+          ? prev
+          : [...prev, inserted as unknown as MessageWithSender]
+      )
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    }
   }
 
   // ── File selection ────────────────────────────────────────────────────────
