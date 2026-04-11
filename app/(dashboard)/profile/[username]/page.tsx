@@ -12,9 +12,10 @@ import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import type { Profile, PostWithAuthor } from '@/types/app'
+import { use } from 'react'
 
-export default function ProfilePage({ params }: { params: { username: string } }) {
-  const { username } = params
+export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = use(params)
   const { user: me } = useUser()
   const router = useRouter()
   const qc = useQueryClient()
