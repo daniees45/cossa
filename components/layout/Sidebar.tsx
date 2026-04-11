@@ -17,6 +17,8 @@ import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/hooks/useUser'
 import { cn } from '@/lib/utils/cn'
 import { getInitials } from '@/lib/utils/uploadFile'
+import { useEffect } from 'react'
+import { useChatStore } from '@/lib/stores/chatStore'
 
 const NAV = [
   { label: 'Feed',          href: '/',           icon: LayoutGrid },
@@ -31,6 +33,14 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useUser()
+  const { dmUnread, clearDmUnread } = useChatStore()
+
+  // Clear DM unread badge when user navigates into chat
+  useEffect(() => {
+    if (pathname.startsWith('/chat')) {
+      clearDmUnread()
+    }
+  }, [pathname, clearDmUnread])
 
   async function handleLogout() {
     const supabase = createClient()
@@ -68,6 +78,9 @@ export function Sidebar() {
             >
               <Icon size={18} className={active ? 'text-violet-600' : 'opacity-70 group-hover:opacity-100'} />
               {label}
+              {href === '/chat' && dmUnread > 0 && !active && (
+                <span className="ml-auto w-2 h-2 rounded-full bg-red-500 shrink-0" />
+              )}
               {active && <ChevronRight size={14} className="ml-auto text-violet-500" />}
             </Link>
           )

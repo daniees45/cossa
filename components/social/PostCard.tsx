@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -24,6 +24,10 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const [showComments, setShowComments] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Sync when React Query cache is updated by realtime (likes/comments from others)
+  useEffect(() => { setLikes(post.likes_count) }, [post.likes_count])
+  useEffect(() => { setCommentsCount(post.comments_count) }, [post.comments_count])
 
   async function toggleLike() {
     if (!user) return
@@ -234,9 +238,15 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null)
+  // Track IDs submitted by current user to avoid double-counting via realtime
+  const submittedRef = useRef(new Set<string>())
+  const onCommentAddedRef = useRef(onCommentAdded)
+  useEffect(() => { onCommentAddedRef.current = onCommentAdded }, [onCommentAdded])
 
-  useState(() => {
+  useEffect(() => {
+    setLoading(true)
     const supabase = createClient()
+
     supabase
       .from('post_comments')
       .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
@@ -247,7 +257,44 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
         if (data) setComments(buildTree(data as unknown as CommentRow[]))
         setLoading(false)
       })
-  })
+
+    // Live subscription — new comments from other users appear instantly
+    const realtimeChannel = supabase
+      .channel(`comments-${postId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
+        async (payload) => {
+          const newId = (payload.new as { id: string }).id
+          const { data: row } = await supabase
+            .from('post_comments')
+            .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
+            .eq('id', newId)
+            .single()
+          if (!row) return
+          const newComment = { ...(row as unknown as CommentRow), replies: [] }
+          setComments((prev) => {
+            if (newComment.parent_id) {
+              if (prev.some((c) => c.replies?.some((r) => r.id === newId))) return prev
+              return prev.map((c) =>
+                c.id === newComment.parent_id
+                  ? { ...c, replies: [...(c.replies ?? []), newComment] }
+                  : c
+              )
+            }
+            if (prev.some((c) => c.id === newId)) return prev
+            return [...prev, newComment]
+          })
+          if (!submittedRef.current.has(newId)) {
+            onCommentAddedRef.current?.()
+          }
+          submittedRef.current.delete(newId)
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(realtimeChannel) }
+  }, [postId])
 
   function buildTree(flat: CommentRow[]): CommentRow[] {
     const map = new Map<string, CommentRow>()
@@ -279,6 +326,7 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
       .single()
     if (!error && data) {
       const newComment = { ...(data as unknown as CommentRow), replies: [] }
+      submittedRef.current.add(newComment.id)
       if (replyingTo) {
         setComments((prev) => prev.map((c) =>
           c.id === replyingTo.id
