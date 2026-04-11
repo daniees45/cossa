@@ -94,20 +94,27 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     if (!user) return
     const supabase = createClient()
 
+    // Ensure the user is a channel member so the RLS SELECT policy passes
     supabase
-      .from('messages')
-      .select('*, sender:profiles!sender_id(*)')
-      .eq('channel_id', channelId)
-      .order('created_at', { ascending: true })
-      .limit(50)
-      .then(({ data }) => {
-        if (data) {
-          const msgs = data as unknown as MessageWithSender[]
-          setMessages(msgs)
-          setHasMore(data.length === 50)
-          loadReactions(msgs.map((m) => m.id))
-        }
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
+      .from('channel_members')
+      .upsert({ channel_id: channelId, user_id: user.id }, { onConflict: 'channel_id,user_id' })
+      .then(() => {
+        // Load messages only after membership is confirmed
+        supabase
+          .from('messages')
+          .select('*, sender:profiles!sender_id(*)')
+          .eq('channel_id', channelId)
+          .order('created_at', { ascending: true })
+          .limit(50)
+          .then(({ data }) => {
+            if (data) {
+              const msgs = data as unknown as MessageWithSender[]
+              setMessages(msgs)
+              setHasMore(data.length === 50)
+              loadReactions(msgs.map((m) => m.id))
+            }
+            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
+          })
       })
 
     const ch = supabase
