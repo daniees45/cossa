@@ -30,6 +30,15 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   const [previewMemberCount, setPreviewMemberCount] = useState<number | null>(null)
   const [joinLoading, setJoinLoading] = useState(false)
   const [entryCode, setEntryCode] = useState('')
+  const [showCreateRequest, setShowCreateRequest] = useState(false)
+  const [creatingRequest, setCreatingRequest] = useState(false)
+  const [requestForm, setRequestForm] = useState({
+    name: '',
+    description: '',
+    type: 'public' as 'public' | 'private',
+    private_join_mode: 'approval' as 'approval' | 'code',
+    private_entry_code: '',
+  })
 
   const { data: myChannelIds } = useQuery({
     queryKey: ['my-channel-memberships', user?.id],
@@ -197,6 +206,42 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     router.push(`/chat/${target.id}`)
   }
 
+  async function submitChannelRequest(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user) return
+    const name = requestForm.name.trim()
+    if (!name) return
+
+    setCreatingRequest(true)
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc('request_channel_creation', {
+      p_name: name,
+      p_description: requestForm.description.trim() || null,
+      p_type: requestForm.type,
+      p_private_join_mode: requestForm.type === 'private' ? requestForm.private_join_mode : 'approval',
+      p_private_entry_code:
+        requestForm.type === 'private' && requestForm.private_join_mode === 'code'
+          ? (requestForm.private_entry_code.trim() || null)
+          : null,
+    })
+    setCreatingRequest(false)
+
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+
+    const result = data as { ok: boolean; error?: string }
+    if (!result.ok) {
+      toast.error(result.error ?? 'Could not submit channel request')
+      return
+    }
+
+    toast.success('Channel request submitted for admin approval.')
+    setShowCreateRequest(false)
+    setRequestForm({ name: '', description: '', type: 'public', private_join_mode: 'approval', private_entry_code: '' })
+  }
+
   return (
     <div className="flex h-full">
       {/* Channel list sidebar */}
@@ -211,7 +256,16 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
         <div className="flex-1 overflow-y-auto py-2">
           {/* Channels */}
           <div className="px-3 mb-2">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 px-2">Channels</p>
+            <div className="mb-1 px-2 flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Channels</p>
+              <button
+                onClick={() => setShowCreateRequest(true)}
+                className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 transition"
+                title="Request new channel"
+              >
+                Request
+              </button>
+            </div>
             {channels?.map((ch) => (
               <button
                 key={ch.id}
@@ -399,6 +453,114 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Channel creation request modal */}
+      {showCreateRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog" aria-labelledby="create-channel-request-title">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowCreateRequest(false)} />
+          <form
+            onSubmit={submitChannelRequest}
+            className="relative z-10 w-full max-w-md mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+          >
+            <div className="px-6 pt-6 pb-4 space-y-3">
+              <h2 id="create-channel-request-title" className="text-base font-semibold text-slate-900 dark:text-white">
+                Request a New Channel
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Your request will be reviewed by admins before the channel is created.
+              </p>
+
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Channel name</label>
+                <input
+                  value={requestForm.name}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. backend-lab"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Description</label>
+                <textarea
+                  value={requestForm.description}
+                  onChange={(e) => setRequestForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="What is the channel for?"
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {(['public', 'private'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setRequestForm((f) => ({ ...f, type: t }))}
+                    className={cn(
+                      'rounded-lg border px-3 py-1.5 text-xs font-medium capitalize',
+                      requestForm.type === t
+                        ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300',
+                    )}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              {requestForm.type === 'private' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['approval', 'code'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setRequestForm((f) => ({ ...f, private_join_mode: mode }))}
+                        className={cn(
+                          'rounded-lg border px-3 py-1.5 text-xs font-medium capitalize',
+                          requestForm.private_join_mode === mode
+                            ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300',
+                        )}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                  {requestForm.private_join_mode === 'code' && (
+                    <input
+                      value={requestForm.private_entry_code}
+                      onChange={(e) => setRequestForm((f) => ({ ...f, private_entry_code: e.target.value }))}
+                      placeholder="Private channel entry code"
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
+                      required
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 px-6 pb-5 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCreateRequest(false)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={creatingRequest || (requestForm.type === 'private' && requestForm.private_join_mode === 'code' && !requestForm.private_entry_code.trim())}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-violet-600 hover:bg-violet-500 disabled:opacity-60"
+              >
+                {creatingRequest ? 'Submitting…' : 'Submit request'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

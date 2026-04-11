@@ -55,6 +55,10 @@ export default function AdminChannelsPage() {
     user: { id: string; full_name: string; username: string }
   }
 
+  type ChannelCreationRequest = Database['public']['Tables']['channel_creation_requests']['Row'] & {
+    requester: { id: string; full_name: string; username: string }
+  }
+
   const { data: requests = [] } = useQuery({
     queryKey: ['admin-channel-join-requests'],
     queryFn: async () => {
@@ -65,6 +69,19 @@ export default function AdminChannelsPage() {
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
       return (data ?? []) as unknown as JoinRequest[]
+    },
+  })
+
+  const { data: channelCreationRequests = [] } = useQuery({
+    queryKey: ['admin-channel-creation-requests'],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('channel_creation_requests')
+        .select('id, requested_by, name, description, type, private_join_mode, private_entry_code, status, review_note, reviewed_by, reviewed_at, created_at, requester:profiles!requested_by(id, full_name, username)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+      return (data ?? []) as unknown as ChannelCreationRequest[]
     },
   })
 
@@ -97,6 +114,26 @@ export default function AdminChannelsPage() {
       toast.success(vars.approve ? 'Request approved' : 'Request rejected')
     },
     onError: () => toast.error('Failed to review join request'),
+  })
+
+  const { mutate: reviewChannelCreationRequest, isPending: reviewingCreationRequest } = useMutation({
+    mutationFn: async ({ requestId, approve }: { requestId: string; approve: boolean }) => {
+      const supabase = createClient()
+      const { data, error } = await supabase.rpc('review_channel_creation_request', {
+        p_request_id: requestId,
+        p_approve: approve,
+        p_review_note: null,
+      })
+      if (error) throw error
+      const result = data as { ok: boolean; error?: string }
+      if (!result.ok) throw new Error(result.error ?? 'Could not review creation request')
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-channel-creation-requests'] })
+      qc.invalidateQueries({ queryKey: ['admin-channels'] })
+      toast.success(vars.approve ? 'Channel request approved' : 'Channel request rejected')
+    },
+    onError: () => toast.error('Failed to review channel request'),
   })
 
   function startEdit(ch: typeof channels[0]) {
@@ -400,6 +437,47 @@ export default function AdminChannelsPage() {
                   <button
                     disabled={reviewingRequest}
                     onClick={() => reviewJoinRequest({ channelId: r.channel_id, userId: r.user_id, approve: false })}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Pending channel creation requests */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+        <h3 className="font-semibold text-slate-900 dark:text-white text-sm mb-2">Pending channel creation requests</h3>
+        {channelCreationRequests.length === 0 ? (
+          <p className="text-xs text-slate-400">No pending channel creation requests.</p>
+        ) : (
+          <div className="space-y-2">
+            {channelCreationRequests.map((r) => (
+              <div key={r.id} className="border border-slate-100 dark:border-slate-700 rounded-xl px-3 py-2">
+                <p className="text-sm text-slate-800 dark:text-slate-200">
+                  <span className="font-medium">@{r.requester.username}</span> requested <span className="font-medium">#{r.name}</span>
+                </p>
+                {r.description && <p className="text-xs text-slate-500 mt-0.5">{r.description}</p>}
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Type: <span className="capitalize">{r.type}</span>
+                  {r.type === 'private' ? ` · Join: ${r.private_join_mode}` : ''}
+                  {' · '}
+                  {formatDate(r.created_at)}
+                </p>
+                <div className="mt-2 flex items-center gap-1.5">
+                  <button
+                    disabled={reviewingCreationRequest}
+                    onClick={() => reviewChannelCreationRequest({ requestId: r.id, approve: true })}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    disabled={reviewingCreationRequest}
+                    onClick={() => reviewChannelCreationRequest({ requestId: r.id, approve: false })}
                     className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium"
                   >
                     Reject

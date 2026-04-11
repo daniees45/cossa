@@ -6,13 +6,13 @@ import { FeedSkeleton } from '@/components/social/FeedSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SuggestedUsers } from '@/components/social/SuggestedUsers'
 import { TrendingTopics } from '@/components/social/TrendingTopics'
-import { LayoutGrid, Loader2, Users, Bookmark, ArrowUp } from 'lucide-react'
+import { LayoutGrid, Loader2, Users, Bookmark, ArrowUp, Megaphone } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import type { PostWithAuthor } from '@/types/app'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 const TABS: { id: FeedMode; label: string; icon: React.ReactNode }[] = [
   { id: 'all', label: 'For You', icon: <LayoutGrid size={14} /> },
@@ -37,6 +37,31 @@ export default function FeedPage() {
   const feedTopRef = useRef<HTMLDivElement>(null)
 
   const allPosts = data?.pages.flatMap((p) => p) ?? []
+
+  const { data: broadcasts = [] } = useQuery({
+    queryKey: ['feed-broadcasts', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('notifications')
+        .select('id, title, body, link, created_at')
+        .eq('user_id', user!.id)
+        .eq('type', 'broadcast')
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      const dedup = new Map<string, { id: string; title: string; body: string; link: string | null; created_at: string }>()
+      for (const row of data ?? []) {
+        const key = `${row.title}::${row.body}`
+        if (!dedup.has(key)) {
+          dedup.set(key, row)
+        }
+      }
+      return Array.from(dedup.values()).slice(0, 3)
+    },
+  })
+
   const feed = [
     ...localPosts.filter((lp) => !allPosts.find((p) => p.id === lp.id)),
     ...allPosts,
@@ -105,6 +130,27 @@ export default function FeedPage() {
       <div className="flex gap-6 items-start">
         {/* Main feed column */}
         <div className="flex-1 min-w-0 space-y-4" ref={feedTopRef}>
+
+          {broadcasts.length > 0 && (
+            <section className="space-y-2">
+              {broadcasts.map((b) => (
+                <div key={b.id} className="rounded-xl border border-cyan-200/60 dark:border-cyan-900/40 bg-cyan-50 dark:bg-cyan-900/20 px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <Megaphone size={14} className="text-cyan-700 dark:text-cyan-300 mt-0.5 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">{b.title}</p>
+                      <p className="text-xs text-cyan-800/90 dark:text-cyan-100/90 mt-0.5">{b.body}</p>
+                      {b.link && (
+                        <a href={b.link} className="text-xs font-medium text-cyan-700 dark:text-cyan-300 hover:underline mt-1 inline-block">
+                          Open announcement
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </section>
+          )}
 
           {/* Feed tabs */}
           <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">

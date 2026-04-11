@@ -1,4 +1,13 @@
-.admin-portal-skin {
+.light .admin-portal-skin {
+  --admin-panel: rgba(248, 250, 252, 0.9);
+  --admin-panel-soft: rgba(241, 245, 249, 0.9);
+  --admin-border: rgba(148, 163, 184, 0.4);
+  --admin-text: #0f172a;
+  --admin-muted: #475569;
+  --admin-accent: #0e7490;
+}
+
+.dark .admin-portal-skin {
   --admin-panel: rgba(15, 23, 42, 0.68);
   --admin-panel-soft: rgba(15, 23, 42, 0.45);
   --admin-border: rgba(148, 163, 184, 0.24);
@@ -66,7 +75,7 @@
 }
 
 .admin-portal-skin table thead {
-  background: rgba(30, 41, 59, 0.72) !important;
+  background: color-mix(in srgb, var(--admin-panel), #0f172a 12%) !important;
 }
 
 .admin-portal-skin .hover\:bg-slate-50:hover,
@@ -84,5 +93,5 @@
 .admin-portal-skin .bg-violet-600,
 .admin-portal-skin .hover\:bg-violet-700:hover,
 .admin-portal-skin .hover\:bg-violet-500:hover {
-  background: linear-gradient(135deg, #0891b2, #0ea5e9) !important;
+  background: linear-gradient(135deg, #0e7490, #0284c7) !important;
 }

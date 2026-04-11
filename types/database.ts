@@ -445,6 +445,48 @@ export interface Database {
         }
         Relationships: []
       }
+      channel_creation_requests: {
+        Row: {
+          id: string
+          requested_by: string
+          name: string
+          description: string | null
+          type: 'public' | 'private'
+          private_join_mode: 'approval' | 'code'
+          private_entry_code: string | null
+          status: 'pending' | 'approved' | 'rejected'
+          review_note: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          requested_by: string
+          name: string
+          description?: string | null
+          type?: 'public' | 'private'
+          private_join_mode?: 'approval' | 'code'
+          private_entry_code?: string | null
+          status?: 'pending' | 'approved' | 'rejected'
+          review_note?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          description?: string | null
+          type?: 'public' | 'private'
+          private_join_mode?: 'approval' | 'code'
+          private_entry_code?: string | null
+          status?: 'pending' | 'approved' | 'rejected'
+          review_note?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+        }
+        Relationships: []
+      }
       message_reactions: {
         Row: {
           id: string
@@ -650,6 +692,24 @@ export interface Database {
           p_approve: boolean
         }
         Returns: { ok: boolean; approved?: boolean; error?: string }
+      }
+      request_channel_creation: {
+        Args: {
+          p_name: string
+          p_description?: string | null
+          p_type?: string
+          p_private_join_mode?: string
+          p_private_entry_code?: string | null
+        }
+        Returns: { ok: boolean; pending?: boolean; error?: string }
+      }
+      review_channel_creation_request: {
+        Args: {
+          p_request_id: string
+          p_approve: boolean
+          p_review_note?: string | null
+        }
+        Returns: { ok: boolean; approved?: boolean; channel_id?: string; error?: string }
       }
       log_admin_action: {
         Args: {
