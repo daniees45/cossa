@@ -3,13 +3,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { usePathname, useRouter } from 'next/navigation'
-import { Hash, Plus, X, Users, ChevronRight } from 'lucide-react'
+import { Hash, Plus, X, Users, ChevronRight, Lock } from 'lucide-react'
 import { Avatar } from '@/components/shared/Avatar'
 import { cn } from '@/lib/utils/cn'
 import type { Channel, Profile } from '@/types/app'
 import { useChatStore } from '@/lib/stores/chatStore'
 import { Spinner } from '@/components/shared/Spinner'
 import { useEffect, useState, useRef } from 'react'
+import { toast } from 'sonner'
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const { user } = useUser()
@@ -28,6 +29,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   const [joinPreview, setJoinPreview] = useState<Channel | null>(null)
   const [previewMemberCount, setPreviewMemberCount] = useState<number | null>(null)
   const [joinLoading, setJoinLoading] = useState(false)
+  const [entryCode, setEntryCode] = useState('')
 
   const { data: myChannelIds } = useQuery({
     queryKey: ['my-channel-memberships', user?.id],
@@ -49,7 +51,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
       const { data } = await supabase
         .from('channels')
         .select('*')
-        .eq('type', 'public')
+        .in('type', ['public', 'private'])
         .order('name')
       return (data ?? []) as Channel[]
     },
@@ -152,6 +154,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     // Show join preview with description + member count
     setPreviewMemberCount(null)
     setJoinPreview(ch)
+    setEntryCode('')
     const supabase = createClient()
     const { count } = await supabase
       .from('channel_members')
@@ -164,13 +167,33 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     if (!user || !joinPreview) return
     setJoinLoading(true)
     const supabase = createClient()
-    await supabase
-      .from('channel_members')
-      .upsert({ channel_id: joinPreview.id, user_id: user.id }, { onConflict: 'channel_id,user_id' })
+    const { data, error } = await supabase.rpc('request_channel_join', {
+      p_channel_id: joinPreview.id,
+      p_entry_code: entryCode.trim() || null,
+    })
     setJoinLoading(false)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+
+    const result = data as { ok: boolean; joined?: boolean; pending?: boolean; error?: string }
+    if (!result.ok) {
+      toast.error(result.error ?? 'Could not join channel')
+      return
+    }
+
+    if (result.pending) {
+      toast.success('Join request sent. Await admin approval.')
+      setJoinPreview(null)
+      return
+    }
+
     const target = joinPreview
+    setPreviewMemberCount((c) => (c === null ? c : c + 1))
     setJoinPreview(null)
     qc.invalidateQueries({ queryKey: ['my-channel-memberships', user.id] })
+    qc.invalidateQueries({ queryKey: ['channel-members', target.id] })
     router.push(`/chat/${target.id}`)
   }
 
@@ -202,6 +225,9 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               >
                 <Hash size={15} className="shrink-0" />
                 <span className="truncate flex-1">{ch.name}</span>
+                {ch.type === 'private' && (
+                  <Lock size={12} className="text-amber-500 shrink-0" />
+                )}
                 {(channelUnread[ch.id] ?? 0) > 0 && pathname !== `/chat/${ch.id}` && (
                   <span className="min-w-[18px] h-[18px] rounded-full bg-violet-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
                     {(channelUnread[ch.id] ?? 0) > 99 ? '99+' : channelUnread[ch.id]}
@@ -336,7 +362,24 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                     : <Spinner size="xs" />}
                 </span>
                 <span className="capitalize px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-full">{joinPreview.type}</span>
+                {joinPreview.type === 'private' && (
+                  <span className="capitalize px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full">
+                    {joinPreview.private_join_mode === 'code' ? 'entry code' : 'approval'}
+                  </span>
+                )}
               </div>
+
+              {joinPreview.type === 'private' && joinPreview.private_join_mode === 'code' && (
+                <div className="mt-3">
+                  <label className="block text-xs text-slate-500 mb-1">Entry code</label>
+                  <input
+                    value={entryCode}
+                    onChange={(e) => setEntryCode(e.target.value)}
+                    placeholder="Enter private channel code"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+              )}
             </div>
             <div className="flex gap-2 px-6 pb-5 justify-end">
               <button
@@ -347,11 +390,11 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               </button>
               <button
                 onClick={confirmJoin}
-                disabled={joinLoading}
+                disabled={joinLoading || (joinPreview.type === 'private' && joinPreview.private_join_mode === 'code' && !entryCode.trim())}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-violet-600 hover:bg-violet-500 disabled:opacity-60 flex items-center gap-2 transition"
               >
                 {joinLoading && <Spinner size="xs" className="border-white/30 border-t-white" />}
-                Join channel
+                {joinPreview.type === 'private' && joinPreview.private_join_mode === 'approval' ? 'Request access' : 'Join channel'}
                 {!joinLoading && <ChevronRight size={14} />}
               </button>
             </div>

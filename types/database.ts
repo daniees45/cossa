@@ -144,6 +144,33 @@ export interface Database {
         }
         Relationships: []
       }
+      admin_audit_logs: {
+        Row: {
+          id: string
+          admin_id: string
+          action: string
+          target_type: string
+          target_id: string | null
+          details: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          admin_id: string
+          action: string
+          target_type: string
+          target_id?: string | null
+          details?: Json
+          created_at?: string
+        }
+        Update: {
+          action?: string
+          target_type?: string
+          target_id?: string | null
+          details?: Json
+        }
+        Relationships: []
+      }
       elections: {
         Row: {
           id: string
@@ -359,6 +386,8 @@ export interface Database {
           name: string
           description: string | null
           type: 'public' | 'private' | 'announcement'
+          private_join_mode: 'approval' | 'code'
+          private_entry_code: string | null
           created_by: string
           created_at: string
         }
@@ -367,6 +396,8 @@ export interface Database {
           name: string
           description?: string | null
           type?: 'public' | 'private' | 'announcement'
+          private_join_mode?: 'approval' | 'code'
+          private_entry_code?: string | null
           created_by: string
           created_at?: string
         }
@@ -374,6 +405,8 @@ export interface Database {
           name?: string
           description?: string | null
           type?: 'public' | 'private' | 'announcement'
+          private_join_mode?: 'approval' | 'code'
+          private_entry_code?: string | null
         }
         Relationships: []
       }
@@ -381,6 +414,35 @@ export interface Database {
         Row: { channel_id: string; user_id: string; role: string }
         Insert: { channel_id: string; user_id: string; role?: string }
         Update: { role?: string }
+        Relationships: []
+      }
+      channel_join_requests: {
+        Row: {
+          id: string
+          channel_id: string
+          user_id: string
+          status: 'pending' | 'approved' | 'rejected'
+          request_note: string | null
+          reviewed_by: string | null
+          reviewed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          channel_id: string
+          user_id: string
+          status?: 'pending' | 'approved' | 'rejected'
+          request_note?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          status?: 'pending' | 'approved' | 'rejected'
+          request_note?: string | null
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+        }
         Relationships: []
       }
       message_reactions: {
@@ -573,6 +635,30 @@ export interface Database {
           p_candidate_ids: string[]
         }
         Returns: { ok: boolean; error?: string; count?: number }
+      }
+      request_channel_join: {
+        Args: {
+          p_channel_id: string
+          p_entry_code?: string | null
+        }
+        Returns: { ok: boolean; joined?: boolean; pending?: boolean; already_member?: boolean; error?: string }
+      }
+      review_channel_join_request: {
+        Args: {
+          p_channel_id: string
+          p_user_id: string
+          p_approve: boolean
+        }
+        Returns: { ok: boolean; approved?: boolean; error?: string }
+      }
+      log_admin_action: {
+        Args: {
+          p_action: string
+          p_target_type: string
+          p_target_id?: string | null
+          p_details?: Json
+        }
+        Returns: string
       }
     }
     Enums: Record<string, never>

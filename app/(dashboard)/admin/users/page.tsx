@@ -30,6 +30,7 @@ type ReportRow = {
 }
 
 type PostReport = Database['public']['Tables']['post_reports']['Row']
+type AuditDetails = Database['public']['Functions']['log_admin_action']['Args']['p_details']
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useUser()
@@ -40,6 +41,20 @@ export default function AdminUsersPage() {
   const [filter, setFilter] = useState<'all' | 'banned' | 'reported'>('all')
   const [expandedBan, setExpandedBan] = useState<string | null>(null)
   const [banReason, setBanReason] = useState('')
+
+  async function logAdminAction(action: string, targetType: string, targetId: string | null, details: AuditDetails = {}) {
+    try {
+      const supabase = createClient()
+      await supabase.rpc('log_admin_action', {
+        p_action: action,
+        p_target_type: targetType,
+        p_target_id: targetId,
+        p_details: details,
+      })
+    } catch {
+      // Avoid blocking critical admin actions if logging fails.
+    }
+  }
 
   // ── Users ───────────────────────────────────────────────────────────────────
   const { data: users = [] } = useQuery({
@@ -104,10 +119,11 @@ export default function AdminUsersPage() {
 
   // ── Mutations ───────────────────────────────────────────────────────────────
   const { mutate: updateRole } = useMutation({
-    mutationFn: async ({ id, role }: { id: string; role: Role }) => {
+    mutationFn: async ({ id, role, previousRole }: { id: string; role: Role; previousRole: Role }) => {
       const supabase = createClient()
       const { error } = await supabase.from('profiles').update({ role }).eq('id', id)
       if (error) throw error
+      await logAdminAction('role_changed', 'profile', id, { previousRole, newRole: role })
     },
     onSuccess: () => { toast.success('Role updated'); qc.invalidateQueries({ queryKey: ['admin-users'] }) },
     onError: () => toast.error('Failed to update role'),
@@ -121,6 +137,9 @@ export default function AdminUsersPage() {
         .update({ is_banned, ban_reason: is_banned ? (ban_reason ?? null) : null })
         .eq('id', id)
       if (error) throw error
+      await logAdminAction(is_banned ? 'user_banned' : 'user_unbanned', 'profile', id, {
+        banReason: is_banned ? (ban_reason ?? null) : null,
+      })
     },
     onSuccess: (_, { is_banned }) => {
       toast.success(is_banned ? 'User banned' : 'User unbanned')
@@ -137,6 +156,7 @@ export default function AdminUsersPage() {
       const supabase = createClient()
       const { error } = await supabase.from('post_reports').update({ status }).eq('id', id)
       if (error) throw error
+      await logAdminAction('report_status_updated', 'post_report', id, { status })
     },
     onSuccess: () => { toast.success('Report updated'); refetchReports() },
     onError: () => toast.error('Failed to update report'),
@@ -146,6 +166,7 @@ export default function AdminUsersPage() {
     mutationFn: async (id: string) => {
       const supabase = createClient()
       await supabase.from('post_reports').delete().eq('id', id)
+      await logAdminAction('report_deleted', 'post_report', id)
     },
     onSuccess: () => { toast.success('Report deleted'); refetchReports() },
   })
@@ -253,7 +274,7 @@ export default function AdminUsersPage() {
                         {isSuperAdmin && user.id !== currentUser?.id ? (
                           <select
                             value={user.role}
-                            onChange={(e) => updateRole({ id: user.id, role: e.target.value as Role })}
+                            onChange={(e) => updateRole({ id: user.id, role: e.target.value as Role, previousRole: user.role })}
                             className="text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-500"
                           >
                             {ROLE_OPTIONS.map((r) => (

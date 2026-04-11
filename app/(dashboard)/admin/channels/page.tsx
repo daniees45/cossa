@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Plus, Trash2, Loader2, Hash, Lock, Megaphone, Pencil } from 'lucide-react'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { formatDate } from '@/lib/utils/formatDate'
+import type { Database } from '@/types/database'
 
 type ChannelType = 'public' | 'private' | 'announcement'
 
@@ -27,7 +28,13 @@ export default function AdminChannelsPage() {
   const qc = useQueryClient()
   const { confirm } = useDialog()
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '', type: 'public' as ChannelType })
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    type: 'public' as ChannelType,
+    private_join_mode: 'approval' as 'approval' | 'code',
+    private_entry_code: '',
+  })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -43,6 +50,24 @@ export default function AdminChannelsPage() {
     },
   })
 
+  type JoinRequest = Database['public']['Tables']['channel_join_requests']['Row'] & {
+    channel: { id: string; name: string }
+    user: { id: string; full_name: string; username: string }
+  }
+
+  const { data: requests = [] } = useQuery({
+    queryKey: ['admin-channel-join-requests'],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('channel_join_requests')
+        .select('id, channel_id, user_id, status, request_note, reviewed_by, reviewed_at, created_at, channel:channels(id, name), user:profiles!user_id(id, full_name, username)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+      return (data ?? []) as unknown as JoinRequest[]
+    },
+  })
+
   const { mutate: deleteChannel } = useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient()
@@ -54,9 +79,35 @@ export default function AdminChannelsPage() {
     },
   })
 
+  const { mutate: reviewJoinRequest, isPending: reviewingRequest } = useMutation({
+    mutationFn: async ({ channelId, userId, approve }: { channelId: string; userId: string; approve: boolean }) => {
+      const supabase = createClient()
+      const { data, error } = await supabase.rpc('review_channel_join_request', {
+        p_channel_id: channelId,
+        p_user_id: userId,
+        p_approve: approve,
+      })
+      if (error) throw error
+      const result = data as { ok: boolean; error?: string }
+      if (!result.ok) throw new Error(result.error ?? 'Could not review request')
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['admin-channel-join-requests'] })
+      qc.invalidateQueries({ queryKey: ['admin-channels'] })
+      toast.success(vars.approve ? 'Request approved' : 'Request rejected')
+    },
+    onError: () => toast.error('Failed to review join request'),
+  })
+
   function startEdit(ch: typeof channels[0]) {
     setEditingId(ch.id)
-    setForm({ name: ch.name, description: ch.description ?? '', type: ch.type as ChannelType })
+    setForm({
+      name: ch.name,
+      description: ch.description ?? '',
+      type: ch.type as ChannelType,
+      private_join_mode: (ch.private_join_mode ?? 'approval') as 'approval' | 'code',
+      private_entry_code: ch.private_entry_code ?? '',
+    })
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -64,7 +115,7 @@ export default function AdminChannelsPage() {
   function cancelForm() {
     setShowForm(false)
     setEditingId(null)
-    setForm({ name: '', description: '', type: 'public' })
+    setForm({ name: '', description: '', type: 'public', private_join_mode: 'approval', private_entry_code: '' })
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -75,7 +126,14 @@ export default function AdminChannelsPage() {
         const supabase = createClient()
         const { error } = await supabase
           .from('channels')
-          .update({ description: form.description.trim() || null, type: form.type })
+          .update({
+            description: form.description.trim() || null,
+            type: form.type,
+            private_join_mode: form.type === 'private' ? form.private_join_mode : 'approval',
+            private_entry_code: form.type === 'private' && form.private_join_mode === 'code'
+              ? (form.private_entry_code.trim() || null)
+              : null,
+          })
           .eq('id', editingId)
         if (error) throw error
         toast.success('Channel updated!')
@@ -97,6 +155,10 @@ export default function AdminChannelsPage() {
         name: slug,
         description: form.description.trim() || null,
         type: form.type,
+        private_join_mode: form.type === 'private' ? form.private_join_mode : 'approval',
+        private_entry_code: form.type === 'private' && form.private_join_mode === 'code'
+          ? (form.private_entry_code.trim() || null)
+          : null,
         created_by: user!.id,
       })
       if (error) throw error
@@ -188,9 +250,40 @@ export default function AdminChannelsPage() {
             </div>
             <p className="text-xs text-slate-400 mt-2">
               {form.type === 'public' && 'Visible and joinable by all members'}
-              {form.type === 'private' && 'Invite-only — members must be added manually'}
+              {form.type === 'private' && 'Private channel — users join with entry code or admin approval'}
               {form.type === 'announcement' && 'Only admins can post; members can read'}
             </p>
+
+            {form.type === 'private' && (
+              <div className="mt-3 space-y-2">
+                <label className="block text-sm text-slate-600 dark:text-slate-400">Private join method</label>
+                <div className="flex gap-2 flex-wrap">
+                  {(['approval', 'code'] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setForm({ ...form, private_join_mode: m })}
+                      className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors capitalize ${
+                        form.private_join_mode === m
+                          ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                {form.private_join_mode === 'code' && (
+                  <input
+                    value={form.private_entry_code}
+                    onChange={(e) => setForm({ ...form, private_entry_code: e.target.value })}
+                    placeholder="Set entry code"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-violet-500"
+                    required
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-2">
@@ -245,6 +338,11 @@ export default function AdminChannelsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {type === 'private' && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 capitalize">
+                      {ch.private_join_mode ?? 'approval'}
+                    </span>
+                  )}
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${TYPE_COLORS[type]}`}>
                     {type}
                   </span>
@@ -270,6 +368,43 @@ export default function AdminChannelsPage() {
           })}
         </div>
       )}
+
+      {/* Pending join requests */}
+      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
+        <h3 className="font-semibold text-slate-900 dark:text-white text-sm mb-2">Pending private channel requests</h3>
+        {requests.length === 0 ? (
+          <p className="text-xs text-slate-400">No pending requests.</p>
+        ) : (
+          <div className="space-y-2">
+            {requests.map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-2 border border-slate-100 dark:border-slate-700 rounded-xl px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-800 dark:text-slate-200 truncate">
+                    <span className="font-medium">@{r.user.username}</span> requests to join <span className="font-medium">#{r.channel.name}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-400">{formatDate(r.created_at)}</p>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    disabled={reviewingRequest}
+                    onClick={() => reviewJoinRequest({ channelId: r.channel_id, userId: r.user_id, approve: true })}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    disabled={reviewingRequest}
+                    onClick={() => reviewJoinRequest({ channelId: r.channel_id, userId: r.user_id, approve: false })}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

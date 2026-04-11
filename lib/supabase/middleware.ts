@@ -34,6 +34,7 @@ export async function updateSession(request: NextRequest) {
 
   const isAuthRoute =
     pathname.startsWith('/login') ||
+    pathname.startsWith('/banned') ||
     pathname.startsWith('/register') ||
     pathname.startsWith('/verify') ||
     pathname.startsWith('/forgot-password') ||
@@ -49,8 +50,13 @@ export async function updateSession(request: NextRequest) {
     if (profile?.is_banned) {
       await supabase.auth.signOut()
       const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      url.searchParams.set('banned', '1')
+      url.pathname = '/banned'
+      return NextResponse.redirect(url)
+    }
+
+    if (pathname.startsWith('/banned')) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
       return NextResponse.redirect(url)
     }
   }

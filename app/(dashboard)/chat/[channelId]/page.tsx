@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useRef, useState, use } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
@@ -37,6 +37,7 @@ function formatTime(iso: string) {
 export default function ChannelPage({ params }: { params: Promise<{ channelId: string }> }) {
   const { channelId } = use(params)
   const { user } = useUser()
+  const qc = useQueryClient()
   const { setChannelUnread } = useChatStore()
   const { confirm } = useDialog()
 
@@ -88,6 +89,21 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     },
   })
 
+  const { data: isMember, isLoading: memberCheckLoading } = useQuery({
+    queryKey: ['channel-membership', channelId, user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('channel_id', channelId)
+        .eq('user_id', user!.id)
+        .maybeSingle()
+      return !!data
+    },
+  })
+
   const { data: memberCount } = useQuery({
     queryKey: ['channel-members', channelId],
     queryFn: async () => {
@@ -96,6 +112,23 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       return count ?? 0
     },
   })
+
+  useEffect(() => {
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`channel-members-${channelId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'channel_members', filter: `channel_id=eq.${channelId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ['channel-members', channelId] })
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(ch)
+    }
+  }, [channelId, qc])
 
   // Mark channel as read on mount
   useEffect(() => {
@@ -127,30 +160,27 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   // Load initial messages + realtime subscription
   useEffect(() => {
-    if (!user) return
+    if (!user || memberCheckLoading) return
+    if (!isMember) {
+      setMessages([])
+      return
+    }
     const supabase = createClient()
 
-    // Ensure the user is a channel member so the RLS SELECT policy passes
     supabase
-      .from('channel_members')
-      .upsert({ channel_id: channelId, user_id: user.id }, { onConflict: 'channel_id,user_id' })
-      .then(() => {
-        // Load messages only after membership is confirmed
-        supabase
-          .from('messages')
-          .select('*, sender:profiles!sender_id(*)')
-          .eq('channel_id', channelId)
-          .order('created_at', { ascending: true })
-          .limit(50)
-          .then(({ data }) => {
-            if (data) {
-              const msgs = data as unknown as MessageWithSender[]
-              setMessages(msgs)
-              setHasMore(data.length === 50)
-              loadReactions(msgs.map((m) => m.id))
-            }
-            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
-          })
+      .from('messages')
+      .select('*, sender:profiles!sender_id(*)')
+      .eq('channel_id', channelId)
+      .order('created_at', { ascending: true })
+      .limit(50)
+      .then(({ data }) => {
+        if (data) {
+          const msgs = data as unknown as MessageWithSender[]
+          setMessages(msgs)
+          setHasMore(data.length === 50)
+          loadReactions(msgs.map((m) => m.id))
+        }
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       })
 
     const ch = supabase
@@ -240,7 +270,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       Object.values(typingTimeoutsRef.current).forEach(clearTimeout)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId, user])
+  }, [channelId, user, isMember, memberCheckLoading])
 
   // Scroll-to-bottom button
   useEffect(() => {
@@ -278,7 +308,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
-    if ((!text.trim() && !mediaFile) || !user || sending || uploading) return
+    if ((!text.trim() && !mediaFile) || !user || !isMember || sending || uploading) return
     setSending(true)
 
     let mediaUrl: string | null = null
@@ -387,6 +417,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     if (!ok) return
     const supabase = createClient()
     await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('user_id', user.id)
+    qc.invalidateQueries({ queryKey: ['channel-membership', channelId, user.id] })
+    qc.invalidateQueries({ queryKey: ['channel-members', channelId] })
     window.location.href = '/chat'
   }
 
@@ -412,6 +444,31 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   }
 
   const isMuted = mutedChannels.includes(channelId)
+
+  if (memberCheckLoading) {
+    return (
+      <div className="h-full flex items-center justify-center text-sm text-slate-400">Loading channel…</div>
+    )
+  }
+
+  if (!isMember) {
+    return (
+      <div className="h-full flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center">
+          <p className="text-base font-semibold text-slate-900 dark:text-white">Private access required</p>
+          <p className="text-sm text-slate-500 mt-2">
+            You are not a member of #{channel?.name ?? 'this channel'}. Join from the channel list using entry code or request approval.
+          </p>
+          <Link
+            href="/chat"
+            className="inline-flex mt-4 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium"
+          >
+            Back to channels
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full" onClick={() => setPickerFor(null)}>

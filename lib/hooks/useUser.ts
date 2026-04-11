@@ -25,6 +25,7 @@ export function useUser() {
         await supabase.auth.signOut()
         setUser(null)
         setLoading(false)
+        if (typeof window !== 'undefined') window.location.replace('/banned')
         return
       }
       if (data) setUser(data as Profile)
