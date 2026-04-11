@@ -3,12 +3,13 @@ import { create } from 'zustand'
 interface ChatState {
   /** senderId → unread count (realtime-incremented) */
   dmUnread: Record<string, number>
-  /** channelId → has unread since last visit */
-  channelUnread: Record<string, boolean>
+  /** channelId → unread count since last visit */
+  channelUnread: Record<string, number>
 
   incDmUnread: (senderId: string) => void
   clearDmUnread: (senderId?: string) => void   // no arg = clear all
-  setChannelUnread: (channelId: string, hasUnread: boolean) => void
+  incChannelUnread: (channelId: string) => void
+  setChannelUnread: (channelId: string, count: number) => void
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -25,6 +26,10 @@ export const useChatStore = create<ChatState>((set) => ({
       return { dmUnread: rest }
     }),
 
-  setChannelUnread: (channelId, hasUnread) =>
-    set((s) => ({ channelUnread: { ...s.channelUnread, [channelId]: hasUnread } })),
+  incChannelUnread: (channelId) =>
+    set((s) => ({ channelUnread: { ...s.channelUnread, [channelId]: (s.channelUnread[channelId] ?? 0) + 1 } })),
+
+  setChannelUnread: (channelId, count) =>
+    set((s) => ({ channelUnread: { ...s.channelUnread, [channelId]: count } })),
 }))
+

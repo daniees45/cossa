@@ -33,8 +33,10 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useUser()
-  const { dmUnread, clearDmUnread } = useChatStore()
+  const { dmUnread, clearDmUnread, channelUnread } = useChatStore()
   const totalDmUnread = Object.values(dmUnread).reduce((a, b) => a + b, 0)
+  const totalChannelUnread = Object.values(channelUnread).reduce((a, b) => a + b, 0)
+  const totalUnread = totalDmUnread + totalChannelUnread
 
   // Clear DM unread badge when user navigates into chat
   useEffect(() => {
@@ -79,8 +81,10 @@ export function Sidebar() {
             >
               <Icon size={18} className={active ? 'text-violet-600' : 'opacity-70 group-hover:opacity-100'} />
               {label}
-              {href === '/chat' && totalDmUnread > 0 && !active && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-red-500 shrink-0" />
+              {href === '/chat' && totalUnread > 0 && !active && (
+                <span className="ml-auto min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
+                  {totalUnread > 99 ? '99+' : totalUnread}
+                </span>
               )}
               {active && <ChevronRight size={14} className="ml-auto text-violet-500" />}
             </Link>

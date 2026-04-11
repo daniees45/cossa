@@ -63,7 +63,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   // Mark channel as read on mount
   useEffect(() => {
-    setChannelUnread(channelId, false)
+    setChannelUnread(channelId, 0)
   }, [channelId, setChannelUnread])
 
   // Load reactions for message IDs

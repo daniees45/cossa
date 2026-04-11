@@ -86,7 +86,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const match = pathname.match(/^\/chat\/([^/]+)$/)
     if (match && match[1] !== 'dm') {
-      setChannelUnread(match[1], false)
+      setChannelUnread(match[1], 0)
     }
   }, [pathname, setChannelUnread])
 
@@ -152,8 +152,10 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               >
                 <Hash size={15} className="shrink-0" />
                 <span className="truncate flex-1">{ch.name}</span>
-                {channelUnread[ch.id] && pathname !== `/chat/${ch.id}` && (
-                  <span className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />
+                {(channelUnread[ch.id] ?? 0) > 0 && pathname !== `/chat/${ch.id}` && (
+                  <span className="min-w-[18px] h-[18px] rounded-full bg-violet-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
+                    {(channelUnread[ch.id] ?? 0) > 99 ? '99+' : channelUnread[ch.id]}
+                  </span>
                 )}
               </Link>
             ))}

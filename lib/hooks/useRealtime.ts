@@ -10,7 +10,7 @@ import type { PostWithAuthor } from '@/types/app'
 export function useRealtime() {
   const { user } = useUser()
   const { addNotification } = useNotificationStore()
-  const { incDmUnread, setChannelUnread } = useChatStore()
+  const { incDmUnread, incChannelUnread } = useChatStore()
   const qc = useQueryClient()
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export function useRealtime() {
         (payload) => {
           const msg = payload.new as { channel_id: string | null; sender_id: string }
           if (msg.channel_id && msg.sender_id !== user.id) {
-            setChannelUnread(msg.channel_id, true)
+            incChannelUnread(msg.channel_id)
           }
         }
       )
@@ -115,5 +115,5 @@ export function useRealtime() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, addNotification, incDmUnread, setChannelUnread, qc])
+  }, [user, addNotification, incDmUnread, incChannelUnread, qc])
 }
