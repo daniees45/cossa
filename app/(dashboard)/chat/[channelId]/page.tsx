@@ -46,6 +46,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const lastTypeBroadcastRef = useRef(0)
   const typingChRef = useRef<RealtimeChannel | null>(null)
+  const chRef = useRef<RealtimeChannel | null>(null)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -111,6 +112,16 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
     const ch = supabase
       .channel(`channel-${channelId}`)
+      // ── Broadcast: instant delivery to all channel members ────────────────
+      .on('broadcast', { event: 'new_message' }, (payload) => {
+        const msg = payload.payload as MessageWithSender
+        if (!msg?.id) return
+        setMessages((prev) =>
+          prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
+        )
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+      })
+      // ── postgres_changes: fallback for multi-device / future-proofing ───────
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
@@ -164,8 +175,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         },
       )
       .subscribe()
-
-    // Typing broadcast channel
+    chRef.current = ch
     const typingCh = supabase
       .channel(`typing-ch-${channelId}`)
       .on('broadcast', { event: 'typing' }, (payload) => {
@@ -243,15 +253,15 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       .single()
     setText('')
     setSending(false)
-    // Sender sees their own message immediately (optimistic).
-    // The realtime handler is deduplicated, so other channel members also see it.
     if (inserted) {
+      const msg = inserted as unknown as MessageWithSender
+      // Optimistic: sender sees immediately
       setMessages((prev) =>
-        prev.find((m) => m.id === (inserted as { id: string }).id)
-          ? prev
-          : [...prev, inserted as unknown as MessageWithSender]
+        prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
       )
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+      // Broadcast to all channel members for instant delivery
+      chRef.current?.send({ type: 'broadcast', event: 'new_message', payload: msg })
     }
   }
 

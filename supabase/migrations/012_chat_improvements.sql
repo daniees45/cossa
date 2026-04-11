@@ -1,8 +1,13 @@
 -- ============================================================
 -- COSSA — Chat improvements
--- Edit/delete messages, read receipts, emoji reactions
+-- Edit/delete messages, read receipts, emoji reactions, realtime
 -- Run this in Supabase SQL Editor
 -- ============================================================
+
+-- ── Enable Realtime on messages (REQUIRED for postgres_changes) ────────────
+-- If the publication already exists, just add the tables
+ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE message_reactions;
 
 -- ── Add edited_at column to messages ──────────────────────
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS edited_at timestamptz;

@@ -61,6 +61,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypeBroadcastRef = useRef(0)
   const typingChRef = useRef<RealtimeChannel | null>(null)
+  const dmChannelRef = useRef<RealtimeChannel | null>(null)
 
   // ── Scroll refs ──────────────────────────────────────────────────────────
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -209,6 +210,23 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
     const dmChannel = supabase
       .channel(`dm-${[user.id, userId].sort().join('-')}`)
+      // ── Broadcast: instant delivery without postgres_changes publication ────
+      .on('broadcast', { event: 'new_message' }, async (payload) => {
+        const row = payload.payload as MessageWithSender & { sender: Profile }
+        if (!row?.id) return
+        setMessages((prev) =>
+          prev.find((m) => m.id === row.id)
+            ? prev
+            : [...prev, row]
+        )
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        // Mark as read if we are the receiver
+        if (row.receiver_id === user?.id) {
+          const sb = createClient()
+          await sb.from('messages').update({ read_at: new Date().toISOString() }).eq('id', row.id)
+        }
+      })
+      // ── postgres_changes: fallback for multi-device / missed broadcasts ────
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${user.id}` },
@@ -257,8 +275,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         },
       )
       .subscribe()
-
-    // Typing broadcast channel
+    dmChannelRef.current = dmChannel
     const typingKey = `typing-dm-${[user.id, userId].sort().join('-')}`
     const typingCh = supabase
       .channel(typingKey)
@@ -341,15 +358,15 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       .insert({ sender_id: user.id, receiver_id: userId, content, media_url: mediaUrl })
       .select('*, sender:profiles!sender_id(*)')
       .single()
-    // Sender sees their own message immediately (optimistic).
-    // The realtime handler is deduplicated, so receiver also sees it via realtime.
     if (inserted) {
+      const msg = inserted as unknown as MessageWithSender
+      // Optimistic: sender sees immediately
       setMessages((prev) =>
-        prev.find((m) => m.id === (inserted as { id: string }).id)
-          ? prev
-          : [...prev, inserted as unknown as MessageWithSender]
+        prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
       )
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+      // Broadcast to receiver for instant delivery (bypasses realtime publication)
+      dmChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: msg })
     }
   }
 
