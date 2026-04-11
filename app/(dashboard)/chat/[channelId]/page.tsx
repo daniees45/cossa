@@ -13,6 +13,8 @@ import type { Channel, MessageWithSender } from '@/types/app'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useChatStore } from '@/lib/stores/chatStore'
+import { useDialog } from '@/components/shared/DialogProvider'
+import { Spinner } from '@/components/shared/Spinner'
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
 type Reaction = { emoji: string; count: number; byMe: boolean }
@@ -36,6 +38,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const { channelId } = use(params)
   const { user } = useUser()
   const { setChannelUnread } = useChatStore()
+  const { confirm } = useDialog()
 
   const [messages, setMessages] = useState<MessageWithSender[]>([])
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
@@ -356,7 +359,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   }
 
   async function deleteMessage(id: string) {
-    if (!confirm('Delete this message?')) return
+    const ok = await confirm({ title: 'Delete message', message: 'This will permanently delete the message for everyone in the channel.', confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
     const supabase = createClient()
     await supabase.from('messages').delete().eq('id', id)
   }
@@ -379,7 +383,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   async function leaveChannel() {
     if (!user) return
-    if (!confirm('Leave this channel?')) return
+    const ok = await confirm({ title: 'Leave channel', message: `Leave #${channel?.name ?? 'this channel'}? You can rejoin at any time.`, confirmLabel: 'Leave', variant: 'danger' })
+    if (!ok) return
     const supabase = createClient()
     await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('user_id', user.id)
     window.location.href = '/chat'
@@ -803,7 +808,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           disabled={(!text.trim() && !mediaFile) || sending || uploading}
           className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
         >
-          <Send size={16} className="text-white" />
+          {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
         </button>
       </form>
     </div>

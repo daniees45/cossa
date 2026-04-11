@@ -14,6 +14,8 @@ import type { MessageWithSender, Profile } from '@/types/app'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useChatStore } from '@/lib/stores/chatStore'
+import { useDialog } from '@/components/shared/DialogProvider'
+import { Spinner } from '@/components/shared/Spinner'
 import {
   ensureKeyPair,
   encryptMessage,
@@ -45,6 +47,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const { user } = useUser()
   const qc = useQueryClient()
   const { clearDmUnread } = useChatStore()
+  const { confirm } = useDialog()
 
   const [showSettings, setShowSettings] = useState(false)
   const [mutedDms, setMutedDms] = useState<string[]>(() => {
@@ -464,7 +467,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
   // ── Delete ────────────────────────────────────────────────────────────────
   async function deleteMessage(msg: MessageWithSender) {
-    if (!confirm('Delete this message?')) return
+    const ok = await confirm({ title: 'Delete message', message: msg.read_at ? 'This will remove the message from your view. The recipient will still see it.' : 'This will permanently delete the message for both sides.', confirmLabel: 'Delete', variant: 'danger' })
+    if (!ok) return
     const supabase = createClient()
     if (msg.read_at) {
       // Already read by receiver → soft-delete (hide from sender only)
@@ -498,8 +502,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     })
   }
 
-  function clearConversation() {
-    if (!confirm('Hide all your sent messages from this conversation?')) return
+  async function clearConversation() {
+    const ok = await confirm({ title: 'Clear conversation', message: 'This will hide all your sent messages from this conversation. The other person will not be affected.', confirmLabel: 'Clear', variant: 'danger' })
+    if (!ok) return
     const supabase = createClient()
     // Soft-delete all own messages in this DM (show update to others isn't affected)
     supabase
@@ -959,7 +964,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           disabled={(!text.trim() && !mediaFile) || uploading}
           className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
         >
-          <Send size={16} className="text-white" />
+          {uploading ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
         </button>
       </form>
     </div>

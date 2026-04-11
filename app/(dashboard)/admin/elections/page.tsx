@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/shared/Badge'
 import { Avatar } from '@/components/shared/Avatar'
 import { Plus, Loader2, Trash2, Users, ChevronDown, ChevronUp, Camera, Search, ShieldCheck, ClipboardList, X } from 'lucide-react'
+import { useDialog } from '@/components/shared/DialogProvider'
 import { formatEventDate } from '@/lib/utils/formatDate'
 import type { Election, CandidateWithProfile } from '@/types/app'
 
@@ -37,6 +38,7 @@ type ResolvedProfile = {
 type VoterRollRow = { id: string; student_id: string; full_name: string; voter_id: string | null }
 
 function VoterRollPanel({ electionId }: { electionId: string }) {
+  const { confirm } = useDialog()
   const [rawText, setRawText] = useState('')
   const [parsed, setParsed] = useState<{ student_id: string; full_name: string }[]>([])
   const [parseError, setParseError] = useState('')
@@ -92,7 +94,8 @@ function VoterRollPanel({ electionId }: { electionId: string }) {
   }
 
   async function clearAll() {
-    if (!confirm(`Delete all ${rolls.length} voter roll entries for this election? This cannot be undone.`)) return
+    const ok = await confirm({ title: 'Clear voter roll', message: `Delete all ${rolls.length} voter roll entr${rolls.length !== 1 ? 'ies' : 'y'} for this election? This cannot be undone.`, confirmLabel: 'Clear all', variant: 'danger' })
+    if (!ok) return
     setClearing(true)
     const supabase = createClient()
     await supabase.from('voter_rolls').delete().eq('election_id', electionId)
@@ -487,8 +490,9 @@ function CandidatePanel({ electionId }: { electionId: string }) {
 export default function AdminElectionsPage() {
   const { user } = useUser()
   const qc = useQueryClient()
-  const [creating, setCreating] = useState(false)
+  const { confirm } = useDialog()
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
   const [voterRollId, setVoterRollId] = useState<string | null>(null)
   const [selectedLevels, setSelectedLevels] = useState<string[]>([])
 

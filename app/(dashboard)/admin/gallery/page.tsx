@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Plus, Trash2, Loader2, Image as ImageIcon, Upload } from 'lucide-react'
+import { useDialog } from '@/components/shared/DialogProvider'
 
 type GalleryItem = {
   name: string
@@ -12,6 +13,7 @@ type GalleryItem = {
 
 export default function AdminGalleryPage() {
   const qc = useQueryClient()
+  const { confirm } = useDialog()
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -133,8 +135,8 @@ export default function AdminGalleryPage() {
                 />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <button
-                    onClick={() => {
-                      if (confirm('Delete this photo?')) deletePhoto(photo.name)
+                    onClick={async () => {
+                      if (await confirm({ title: 'Delete photo', message: 'This will permanently remove this photo from the gallery.', confirmLabel: 'Delete', variant: 'danger' })) deletePhoto(photo.name)
                     }}
                     disabled={deleting === photo.name}
                     className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-xl transition-colors disabled:opacity-50"

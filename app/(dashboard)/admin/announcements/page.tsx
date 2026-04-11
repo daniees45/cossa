@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { toast } from 'sonner'
 import { Plus, Trash2, Pin, PinOff, Loader2, Megaphone, Pencil } from 'lucide-react'
+import { useDialog } from '@/components/shared/DialogProvider'
 import { formatDate } from '@/lib/utils/formatDate'
 
 type Category = 'news' | 'academic' | 'urgent'
@@ -18,6 +19,7 @@ const CATEGORIES: { value: Category; label: string; color: string }[] = [
 export default function AdminAnnouncementsPage() {
   const { user } = useUser()
   const qc = useQueryClient()
+  const { confirm } = useDialog()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', body: '', category: 'news' as Category, pinned: false })
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -245,8 +247,8 @@ export default function AdminAnnouncementsPage() {
                       {ann.pinned ? <PinOff size={16} /> : <Pin size={16} />}
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm('Delete this announcement?')) deleteAnn(ann.id)
+                      onClick={async () => {
+                        if (await confirm({ title: 'Delete announcement', message: 'This announcement will be permanently removed.', confirmLabel: 'Delete', variant: 'danger' })) deleteAnn(ann.id)
                       }}
                       title="Delete"
                       className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"

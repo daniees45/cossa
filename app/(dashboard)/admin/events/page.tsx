@@ -6,6 +6,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { uploadFile } from '@/lib/utils/uploadFile'
 import { toast } from 'sonner'
 import { Plus, Trash2, Loader2, Calendar, MapPin, Image as ImageIcon, Pencil } from 'lucide-react'
+import { useDialog } from '@/components/shared/DialogProvider'
 import { formatDate } from '@/lib/utils/formatDate'
 
 type EventType = 'social_event' | 'competition' | 'seminar' | 'fun'
@@ -29,6 +30,7 @@ const blankForm = {
 export default function AdminEventsPage() {
   const { user } = useUser()
   const qc = useQueryClient()
+  const { confirm } = useDialog()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(blankForm)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -312,8 +314,8 @@ export default function AdminEventsPage() {
                     <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm('Delete this event?')) deleteEvent(ev.id)
+                    onClick={async () => {
+                      if (await confirm({ title: 'Delete event', message: 'This event will be permanently deleted.', confirmLabel: 'Delete', variant: 'danger' })) deleteEvent(ev.id)
                     }}
                     title="Delete"
                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors shrink-0"

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { toast } from 'sonner'
 import { Plus, Trash2, Loader2, Hash, Lock, Megaphone, Pencil } from 'lucide-react'
+import { useDialog } from '@/components/shared/DialogProvider'
 import { formatDate } from '@/lib/utils/formatDate'
 
 type ChannelType = 'public' | 'private' | 'announcement'
@@ -24,6 +25,7 @@ const TYPE_COLORS: Record<ChannelType, string> = {
 export default function AdminChannelsPage() {
   const { user } = useUser()
   const qc = useQueryClient()
+  const { confirm } = useDialog()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', type: 'public' as ChannelType })
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -254,8 +256,8 @@ export default function AdminChannelsPage() {
                     <Pencil size={15} />
                   </button>
                   <button
-                    onClick={() => {
-                      if (confirm(`Delete #${ch.name} and all its messages?`)) deleteChannel(ch.id)
+                    onClick={async () => {
+                      if (await confirm({ title: `Delete #${ch.name}`, message: 'This will permanently delete the channel and all its messages. This cannot be undone.', confirmLabel: 'Delete', variant: 'danger' })) deleteChannel(ch.id)
                     }}
                     title="Delete channel"
                     className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
