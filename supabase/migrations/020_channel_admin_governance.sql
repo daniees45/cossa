@@ -32,6 +32,8 @@ AS $$
 DECLARE
   v_actor uuid := auth.uid();
   v_allowed boolean := false;
+  v_actor_name text;
+  v_channel_name text;
 BEGIN
   IF v_actor IS NULL THEN
     RETURN json_build_object('ok', false, 'error', 'Not authenticated.');
@@ -52,6 +54,14 @@ BEGIN
     RETURN json_build_object('ok', false, 'error', 'Only channel admins can review this request.');
   END IF;
 
+  SELECT coalesce(full_name, username, 'Channel admin') INTO v_actor_name
+  FROM profiles
+  WHERE id = v_actor;
+
+  SELECT name INTO v_channel_name
+  FROM channels
+  WHERE id = p_channel_id;
+
   IF p_approve THEN
     INSERT INTO channel_members(channel_id, user_id)
     VALUES (p_channel_id, p_user_id)
@@ -61,12 +71,30 @@ BEGIN
       SET status = 'approved', reviewed_by = v_actor, reviewed_at = now()
       WHERE channel_id = p_channel_id AND user_id = p_user_id;
 
+    INSERT INTO notifications (user_id, type, title, body, link)
+    VALUES (
+      p_user_id,
+      'channel_join_approved',
+      'Channel join approved',
+      coalesce(v_actor_name, 'Channel admin') || ' approved your request to join #' || coalesce(v_channel_name, 'channel'),
+      '/chat/' || p_channel_id
+    );
+
     RETURN json_build_object('ok', true, 'approved', true);
   END IF;
 
   UPDATE channel_join_requests
     SET status = 'rejected', reviewed_by = v_actor, reviewed_at = now()
     WHERE channel_id = p_channel_id AND user_id = p_user_id;
+
+  INSERT INTO notifications (user_id, type, title, body, link)
+  VALUES (
+    p_user_id,
+    'channel_join_rejected',
+    'Channel join rejected',
+    coalesce(v_actor_name, 'Channel admin') || ' rejected your request to join #' || coalesce(v_channel_name, 'channel'),
+    '/chat'
+  );
 
   RETURN json_build_object('ok', true, 'approved', false);
 END;

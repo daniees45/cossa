@@ -138,6 +138,7 @@ DECLARE
   v_actor uuid := auth.uid();
   v_request channel_creation_requests%ROWTYPE;
   v_channel_id uuid;
+  v_actor_name text;
 BEGIN
   IF v_actor IS NULL THEN
     RETURN json_build_object('ok', false, 'error', 'Not authenticated.');
@@ -153,6 +154,10 @@ BEGIN
   SELECT * INTO v_request
   FROM channel_creation_requests
   WHERE id = p_request_id;
+
+  SELECT coalesce(full_name, username, 'Admin') INTO v_actor_name
+  FROM profiles
+  WHERE id = v_actor;
 
   IF NOT FOUND THEN
     RETURN json_build_object('ok', false, 'error', 'Request not found.');
@@ -200,6 +205,15 @@ BEGIN
           review_note = nullif(trim(coalesce(p_review_note, '')), '')
       WHERE id = p_request_id;
 
+    INSERT INTO notifications (user_id, type, title, body, link)
+    VALUES (
+      v_request.requested_by,
+      'channel_creation_approved',
+      'Channel request approved',
+      coalesce(v_actor_name, 'Admin') || ' approved your request for #' || v_request.name,
+      '/chat'
+    );
+
     RETURN json_build_object('ok', true, 'approved', true, 'channel_id', v_channel_id);
   END IF;
 
@@ -209,6 +223,15 @@ BEGIN
         reviewed_at = now(),
         review_note = nullif(trim(coalesce(p_review_note, '')), '')
     WHERE id = p_request_id;
+
+  INSERT INTO notifications (user_id, type, title, body, link)
+  VALUES (
+    v_request.requested_by,
+    'channel_creation_rejected',
+    'Channel request rejected',
+    coalesce(v_actor_name, 'Admin') || ' rejected your request for #' || v_request.name,
+    '/chat'
+  );
 
   RETURN json_build_object('ok', true, 'approved', false);
 END;

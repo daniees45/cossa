@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useRef, useState, use } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
@@ -28,6 +28,14 @@ type ChannelMemberInfo = {
   username: string
   role: ChannelMemberRole
   isOwner: boolean
+}
+type ChannelJoinRequest = {
+  id: string
+  channel_id: string
+  user_id: string
+  created_at: string
+  request_note: string | null
+  user: { id: string; full_name: string; username: string; avatar_url: string | null }
 }
 
 function sameDay(a: string, b: string) {
@@ -78,6 +86,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const [channelDescriptionDraft, setChannelDescriptionDraft] = useState('')
   const [savingChannelDetails, setSavingChannelDetails] = useState(false)
   const [managingMemberId, setManagingMemberId] = useState<string | null>(null)
+  const [reviewingJoinRequestId, setReviewingJoinRequestId] = useState<string | null>(null)
   const [mutedChannels, setMutedChannels] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
     try { return JSON.parse(localStorage.getItem('mutedChannels') ?? '[]') } catch { return [] }
@@ -121,6 +130,47 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   const isMember = !!membership
   const isChannelAdmin = !!user && !!channel && (channel.created_by === user.id || membership?.role === 'admin')
+
+  const { data: pendingJoinRequests = [] } = useQuery({
+    queryKey: ['channel-pending-join-requests', channelId, user?.id],
+    enabled: !!user && isChannelAdmin,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('channel_join_requests')
+        .select('id, channel_id, user_id, created_at, request_note, user:profiles!user_id(id, full_name, username, avatar_url)')
+        .eq('channel_id', channelId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true })
+      return (data ?? []) as unknown as ChannelJoinRequest[]
+    },
+  })
+
+  const { mutate: reviewJoinRequest } = useMutation({
+    mutationFn: async ({ requestId, userId, approve }: { requestId: string; userId: string; approve: boolean }) => {
+      setReviewingJoinRequestId(requestId)
+      const supabase = createClient()
+      const { data, error } = await supabase.rpc('review_channel_join_request', {
+        p_channel_id: channelId,
+        p_user_id: userId,
+        p_approve: approve,
+      })
+      setReviewingJoinRequestId(null)
+      if (error) throw error
+      const result = data as { ok: boolean; error?: string }
+      if (!result.ok) throw new Error(result.error ?? 'Could not review request')
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['channel-pending-join-requests', channelId, user?.id] })
+      qc.invalidateQueries({ queryKey: ['channel-members', channelId] })
+      toast.success(vars.approve ? 'Join request approved' : 'Join request rejected')
+      loadMembers()
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Failed to review join request'
+      toast.error(msg)
+    },
+  })
 
   const { data: memberCount } = useQuery({
     queryKey: ['channel-members', channelId],
@@ -686,6 +736,48 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
             </div>
 
             {/* Members list */}
+            {isChannelAdmin && (
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Pending join requests</p>
+                {pendingJoinRequests.length === 0 ? (
+                  <p className="text-xs text-slate-400">No pending requests.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {pendingJoinRequests.map((r) => (
+                      <div key={r.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-2">
+                        <div className="flex items-center gap-2">
+                          <Avatar src={r.user.avatar_url} name={r.user.full_name} size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">{r.user.full_name}</p>
+                            <p className="text-[11px] text-slate-400 truncate">@{r.user.username}</p>
+                          </div>
+                        </div>
+                        {r.request_note && (
+                          <p className="text-[11px] text-slate-500 mt-1">{r.request_note}</p>
+                        )}
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <button
+                            disabled={reviewingJoinRequestId === r.id}
+                            onClick={() => reviewJoinRequest({ requestId: r.id, userId: r.user_id, approve: true })}
+                            className="text-[10px] px-2 py-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            disabled={reviewingJoinRequestId === r.id}
+                            onClick={() => reviewJoinRequest({ requestId: r.id, userId: r.user_id, approve: false })}
+                            className="text-[10px] px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Members</p>
               {members.length === 0 ? (

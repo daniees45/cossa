@@ -60,7 +60,8 @@ export default function AdminChannelsPage() {
   }
 
   const { data: requests = [] } = useQuery({
-    queryKey: ['admin-channel-join-requests'],
+    queryKey: ['admin-channel-join-requests', user?.id],
+    enabled: !!user,
     queryFn: async () => {
       const supabase = createClient()
       const { data } = await supabase
@@ -74,7 +75,8 @@ export default function AdminChannelsPage() {
   })
 
   const { data: channelCreationRequests = [] } = useQuery({
-    queryKey: ['admin-channel-creation-requests'],
+    queryKey: ['admin-channel-creation-requests', user?.id],
+    enabled: !!user,
     queryFn: async () => {
       const supabase = createClient()
       const { data } = await supabase

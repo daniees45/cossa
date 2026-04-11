@@ -13,6 +13,16 @@ import { useRouter, usePathname } from 'next/navigation'
 import { timeAgo } from '@/lib/utils/formatDate'
 import type { Notification } from '@/types/app'
 
+const VISIBLE_NOTIFICATION_TYPES = [
+  'broadcast',
+  'comment',
+  'channel_creation_approved',
+  'channel_creation_rejected',
+  'channel_join_approved',
+  'channel_join_rejected',
+  'system',
+]
+
 export function Topbar() {
   const { unreadCount, notifications, markAllRead, markOneRead, setNotifications } = useNotificationStore()
   const { user } = useUser()
@@ -42,6 +52,7 @@ export function Topbar() {
       .from('notifications')
       .select('*')
       .eq('user_id', user.id)
+      .in('type', VISIBLE_NOTIFICATION_TYPES)
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => {
@@ -72,6 +83,7 @@ export function Topbar() {
       .from('notifications')
       .update({ read: true })
       .eq('user_id', user.id)
+      .in('type', VISIBLE_NOTIFICATION_TYPES)
   }
 
   return (

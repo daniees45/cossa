@@ -7,6 +7,16 @@ import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useChatStore } from '@/lib/stores/chatStore'
 import type { PostWithAuthor } from '@/types/app'
 
+const VISIBLE_NOTIFICATION_TYPES = new Set([
+  'broadcast',
+  'comment',
+  'channel_creation_approved',
+  'channel_creation_rejected',
+  'channel_join_approved',
+  'channel_join_rejected',
+  'system',
+])
+
 export function useRealtime() {
   const { user } = useUser()
   const { addNotification } = useNotificationStore()
@@ -29,6 +39,8 @@ export function useRealtime() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
+          const n = payload.new as { type?: string }
+          if (!n.type || !VISIBLE_NOTIFICATION_TYPES.has(n.type)) return
           addNotification(payload.new as never)
         }
       )
