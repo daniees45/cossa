@@ -36,6 +36,9 @@ function formatDay(iso: string) {
   if (sameDay(iso, yesterday.toISOString())) return 'Yesterday'
   return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
 }
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}
 
 export default function DMPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params)
@@ -585,7 +588,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               <div className={cn('max-w-[70%]', isOwn ? 'items-end flex flex-col' : '')}>
                 {!grouped && (
                   <p className="text-xs text-slate-400 mb-1 px-1">
-                    {isOwn ? 'You' : msg.sender.full_name} · {timeAgo(msg.created_at)}
+                    {isOwn ? 'You' : msg.sender.full_name}
                   </p>
                 )}
 
@@ -631,24 +634,25 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                       </div>
                     )}
                     {content.trim() && (
-                      <p className="px-3 py-2 whitespace-pre-wrap break-words">{content}</p>
+                      <p className="px-3 pt-2 pb-1 whitespace-pre-wrap break-words">{content}</p>
                     )}
+                    {/* Time + status row inside bubble */}
+                    <div className={cn(
+                      'flex items-center gap-1 px-2.5 pb-1.5 pt-0',
+                      isOwn ? 'justify-end' : 'justify-start',
+                    )}>
+                      {wasEncrypted && <Lock size={9} className="text-emerald-300 shrink-0" />}
+                      {msg.edited_at && <span className="text-[9px] italic opacity-70">(edited)</span>}
+                      <span className={cn(
+                        'text-[10px] opacity-70 leading-none',
+                        isOwn ? 'text-violet-200' : 'text-slate-400',
+                      )}>{formatTime(msg.created_at)}</span>
+                      {isOwn && msg.id === lastReadMsgId && (
+                        <CheckCheck size={12} className="text-violet-200 shrink-0" />
+                      )}
+                    </div>
                   </div>
                 )}
-
-                {/* Footer */}
-                <div className={cn('flex items-center gap-1 mt-0.5 px-0.5', isOwn && 'flex-row-reverse')}>
-                  {(!grouped || msg.edited_at || (isOwn && msg.id === lastReadMsgId)) && (
-                    <span className="text-[10px] text-slate-400">{timeAgo(msg.created_at)}</span>
-                  )}
-                  {wasEncrypted && <Lock size={9} className="text-emerald-500" />}
-                  {msg.edited_at && <span className="text-[9px] text-slate-400 italic">(edited)</span>}
-                  {isOwn && msg.id === lastReadMsgId && (
-                    <span className="text-[9px] text-violet-400 flex items-center gap-0.5 font-medium">
-                      <CheckCheck size={10} /> Seen
-                    </span>
-                  )}
-                </div>
 
                 {/* Reaction bubbles */}
                 {msgReactions.length > 0 && (
