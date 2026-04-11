@@ -2,13 +2,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
-import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Hash, Plus, X } from 'lucide-react'
+import { Hash, Plus, X, Users, ChevronRight } from 'lucide-react'
 import { Avatar } from '@/components/shared/Avatar'
 import { cn } from '@/lib/utils/cn'
 import type { Channel, Profile } from '@/types/app'
 import { useChatStore } from '@/lib/stores/chatStore'
+import { Spinner } from '@/components/shared/Spinner'
 import { useEffect, useState, useRef } from 'react'
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +23,24 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   const [dmSearch, setDmSearch] = useState('')
   const [dmSearchResults, setDmSearchResults] = useState<Profile[]>([])
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Join preview state
+  const [joinPreview, setJoinPreview] = useState<Channel | null>(null)
+  const [previewMemberCount, setPreviewMemberCount] = useState<number | null>(null)
+  const [joinLoading, setJoinLoading] = useState(false)
+
+  const { data: myChannelIds } = useQuery({
+    queryKey: ['my-channel-memberships', user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('channel_members')
+        .select('channel_id')
+        .eq('user_id', user!.id)
+      return new Set((data ?? []).map((r) => r.channel_id))
+    },
+  })
 
   const { data: channels } = useQuery({
     queryKey: ['channels'],
@@ -124,6 +142,38 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     setDmSearch('')
   }
 
+  async function handleChannelClick(ch: Channel) {
+    if (!user) return
+    // Already a member → go straight in
+    if (myChannelIds?.has(ch.id) || pathname === `/chat/${ch.id}`) {
+      router.push(`/chat/${ch.id}`)
+      return
+    }
+    // Show join preview with description + member count
+    setPreviewMemberCount(null)
+    setJoinPreview(ch)
+    const supabase = createClient()
+    const { count } = await supabase
+      .from('channel_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('channel_id', ch.id)
+    setPreviewMemberCount(count ?? 0)
+  }
+
+  async function confirmJoin() {
+    if (!user || !joinPreview) return
+    setJoinLoading(true)
+    const supabase = createClient()
+    await supabase
+      .from('channel_members')
+      .upsert({ channel_id: joinPreview.id, user_id: user.id }, { onConflict: 'channel_id,user_id' })
+    setJoinLoading(false)
+    const target = joinPreview
+    setJoinPreview(null)
+    qc.invalidateQueries({ queryKey: ['my-channel-memberships', user.id] })
+    router.push(`/chat/${target.id}`)
+  }
+
   return (
     <div className="flex h-full">
       {/* Channel list sidebar */}
@@ -140,11 +190,11 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           <div className="px-3 mb-2">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1 px-2">Channels</p>
             {channels?.map((ch) => (
-              <Link
+              <button
                 key={ch.id}
-                href={`/chat/${ch.id}`}
+                onClick={() => handleChannelClick(ch)}
                 className={cn(
-                  'flex items-center gap-2.5 px-2 py-2 rounded-xl text-sm transition',
+                  'w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-sm transition text-left',
                   pathname === `/chat/${ch.id}`
                     ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -157,7 +207,10 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                     {(channelUnread[ch.id] ?? 0) > 99 ? '99+' : channelUnread[ch.id]}
                   </span>
                 )}
-              </Link>
+                {myChannelIds && !myChannelIds.has(ch.id) && pathname !== `/chat/${ch.id}` && (
+                  <span className="text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 font-medium px-1.5 py-0.5 rounded-full shrink-0">Join</span>
+                )}
+              </button>
             ))}
           </div>
 
@@ -250,6 +303,61 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
       )}>
         {children}
       </div>
+
+      {/* Channel join preview modal */}
+      {joinPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          aria-modal="true"
+          role="dialog"
+          aria-labelledby="join-dialog-title"
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setJoinPreview(null)} />
+          <div className="relative z-10 w-full max-w-sm mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="px-6 pt-6 pb-4">
+              <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mb-4">
+                <span className="text-violet-600 font-bold text-xl">#</span>
+              </div>
+              <h2 id="join-dialog-title" className="text-base font-semibold text-slate-900 dark:text-white mb-1">
+                #{joinPreview.name}
+              </h2>
+              {joinPreview.description ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-3">
+                  {joinPreview.description}
+                </p>
+              ) : (
+                <p className="text-sm text-slate-400 italic mb-3">No description.</p>
+              )}
+              <div className="flex items-center gap-3 text-xs text-slate-400">
+                <span className="flex items-center gap-1">
+                  <Users size={11} />
+                  {previewMemberCount !== null
+                    ? `${previewMemberCount} member${previewMemberCount !== 1 ? 's' : ''}`
+                    : <Spinner size="xs" />}
+                </span>
+                <span className="capitalize px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-full">{joinPreview.type}</span>
+              </div>
+            </div>
+            <div className="flex gap-2 px-6 pb-5 justify-end">
+              <button
+                onClick={() => setJoinPreview(null)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmJoin}
+                disabled={joinLoading}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-violet-600 hover:bg-violet-500 disabled:opacity-60 flex items-center gap-2 transition"
+              >
+                {joinLoading && <Spinner size="xs" className="border-white/30 border-t-white" />}
+                Join channel
+                {!joinLoading && <ChevronRight size={14} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

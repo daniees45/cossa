@@ -67,6 +67,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const [mediaFile, setMediaFile] = useState<File | null>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [sending, setSending] = useState(false)
 
   // ── E2EE ────────────────────────────────────────────────────────────────
   const [e2eActive, setE2eActive] = useState(false)
@@ -374,7 +375,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   // ── Send message ─────────────────────────────────────────────────────────
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
-    if ((!text.trim() && !mediaFile) || !user || uploading) return
+    if ((!text.trim() && !mediaFile) || !user || uploading || sending) return
+    setSending(true)
 
     let mediaUrl: string | null = null
     if (mediaFile) {
@@ -415,6 +417,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       // Broadcast to receiver for instant delivery (bypasses realtime publication)
       dmChannelRef.current?.send({ type: 'broadcast', event: 'new_message', payload: msg })
     }
+    setSending(false)
   }
 
   // ── File selection ────────────────────────────────────────────────────────
@@ -961,10 +964,10 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         />
         <button
           type="submit"
-          disabled={(!text.trim() && !mediaFile) || uploading}
+          disabled={(!text.trim() && !mediaFile) || uploading || sending}
           className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
         >
-          {uploading ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
+          {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
         </button>
       </form>
     </div>
