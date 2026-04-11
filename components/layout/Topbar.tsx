@@ -9,7 +9,7 @@ import { getInitials } from '@/lib/utils/uploadFile'
 import { cn } from '@/lib/utils/cn'
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { timeAgo } from '@/lib/utils/formatDate'
 import type { Notification } from '@/types/app'
 
@@ -20,6 +20,7 @@ export function Topbar() {
   const [searchOpen, setSearchOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const pathname = usePathname()
 
   // Cmd+K / Ctrl+K shortcut to open search
   useEffect(() => {
@@ -56,6 +57,12 @@ export function Topbar() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Always dismiss overlays when navigating to another page.
+  useEffect(() => {
+    setOpen(false)
+    setSearchOpen(false)
+  }, [pathname])
 
   async function handleMarkAllRead() {
     markAllRead()

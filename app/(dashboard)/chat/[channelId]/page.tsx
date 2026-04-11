@@ -10,14 +10,25 @@ import {
 import { cn } from '@/lib/utils/cn'
 import { timeAgo } from '@/lib/utils/formatDate'
 import type { Channel, MessageWithSender } from '@/types/app'
+import type { Database } from '@/types/database'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useChatStore } from '@/lib/stores/chatStore'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { Spinner } from '@/components/shared/Spinner'
+import { toast } from 'sonner'
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
 type Reaction = { emoji: string; count: number; byMe: boolean }
+type ChannelMemberRole = Database['public']['Tables']['channel_members']['Row']['role']
+type ChannelMemberInfo = {
+  id: string
+  full_name: string
+  avatar_url: string | null
+  username: string
+  role: ChannelMemberRole
+  isOwner: boolean
+}
 
 function sameDay(a: string, b: string) {
   const da = new Date(a), db = new Date(b)
@@ -62,7 +73,11 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   // Typing indicator
   const [showSettings, setShowSettings] = useState(false)
-  const [members, setMembers] = useState<{ id: string; full_name: string; avatar_url: string | null; username: string }[]>([])
+  const [members, setMembers] = useState<ChannelMemberInfo[]>([])
+  const [channelNameDraft, setChannelNameDraft] = useState('')
+  const [channelDescriptionDraft, setChannelDescriptionDraft] = useState('')
+  const [savingChannelDetails, setSavingChannelDetails] = useState(false)
+  const [managingMemberId, setManagingMemberId] = useState<string | null>(null)
   const [mutedChannels, setMutedChannels] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
     try { return JSON.parse(localStorage.getItem('mutedChannels') ?? '[]') } catch { return [] }
@@ -89,20 +104,23 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     },
   })
 
-  const { data: isMember, isLoading: memberCheckLoading } = useQuery({
+  const { data: membership, isLoading: memberCheckLoading } = useQuery({
     queryKey: ['channel-membership', channelId, user?.id],
     enabled: !!user,
     queryFn: async () => {
       const supabase = createClient()
       const { data } = await supabase
         .from('channel_members')
-        .select('channel_id')
+        .select('channel_id, role')
         .eq('channel_id', channelId)
         .eq('user_id', user!.id)
         .maybeSingle()
-      return !!data
+      return data
     },
   })
+
+  const isMember = !!membership
+  const isChannelAdmin = !!user && !!channel && (channel.created_by === user.id || membership?.role === 'admin')
 
   const { data: memberCount } = useQuery({
     queryKey: ['channel-members', channelId],
@@ -396,19 +414,35 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   }
 
   async function loadMembers() {
+    if (!channel) return
     const supabase = createClient()
     const { data: memberRows } = await supabase
       .from('channel_members')
-      .select('user_id')
+      .select('user_id, role')
       .eq('channel_id', channelId)
-      .limit(50)
+      .limit(200)
     if (!memberRows?.length) return
     const ids = memberRows.map((r) => r.user_id)
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, avatar_url, username')
       .in('id', ids)
-    if (profiles) setMembers(profiles as { id: string; full_name: string; avatar_url: string | null; username: string }[])
+    if (profiles) {
+      const roleMap = new Map(memberRows.map((r) => [r.user_id, r.role]))
+      setMembers((profiles as { id: string; full_name: string; avatar_url: string | null; username: string }[])
+        .map((p) => ({
+          ...p,
+          role: (roleMap.get(p.id) ?? 'member') as ChannelMemberRole,
+          isOwner: p.id === channel.created_by,
+        }))
+        .sort((a, b) => {
+          if (a.isOwner) return -1
+          if (b.isOwner) return 1
+          if (a.role === 'admin' && b.role !== 'admin') return -1
+          if (a.role !== 'admin' && b.role === 'admin') return 1
+          return a.full_name.localeCompare(b.full_name)
+        }))
+    }
   }
 
   async function leaveChannel() {
@@ -416,10 +450,96 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     const ok = await confirm({ title: 'Leave channel', message: `Leave #${channel?.name ?? 'this channel'}? You can rejoin at any time.`, confirmLabel: 'Leave', variant: 'danger' })
     if (!ok) return
     const supabase = createClient()
-    await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('user_id', user.id)
+    const { data, error } = await supabase.rpc('remove_channel_member', {
+      p_channel_id: channelId,
+      p_user_id: user.id,
+    })
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    const result = data as { ok: boolean; error?: string }
+    if (!result.ok) {
+      toast.error(result.error ?? 'Could not leave channel')
+      return
+    }
     qc.invalidateQueries({ queryKey: ['channel-membership', channelId, user.id] })
     qc.invalidateQueries({ queryKey: ['channel-members', channelId] })
     window.location.href = '/chat'
+  }
+
+  async function saveChannelDetails() {
+    if (!isChannelAdmin) return
+    setSavingChannelDetails(true)
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc('update_channel_details', {
+      p_channel_id: channelId,
+      p_name: channelNameDraft,
+      p_description: channelDescriptionDraft,
+    })
+    setSavingChannelDetails(false)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    const result = data as { ok: boolean; error?: string }
+    if (!result.ok) {
+      toast.error(result.error ?? 'Could not update channel')
+      return
+    }
+    toast.success('Channel details updated')
+    qc.invalidateQueries({ queryKey: ['channel', channelId] })
+    qc.invalidateQueries({ queryKey: ['channels'] })
+    loadMembers()
+  }
+
+  async function setMemberRole(member: ChannelMemberInfo, role: 'admin' | 'member') {
+    const actionLabel = role === 'admin' ? 'promote to admin' : 'change to member'
+    const ok = await confirm({
+      title: 'Confirm role change',
+      message: `Are you sure you want to ${actionLabel} ${member.full_name}?`,
+      confirmLabel: role === 'admin' ? 'Promote' : 'Demote',
+      variant: 'danger',
+    })
+    if (!ok) return
+
+    setManagingMemberId(member.id)
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc('set_channel_member_role', {
+      p_channel_id: channelId,
+      p_user_id: member.id,
+      p_role: role,
+    })
+    setManagingMemberId(null)
+    if (error) { toast.error(error.message); return }
+    const result = data as { ok: boolean; error?: string }
+    if (!result.ok) { toast.error(result.error ?? 'Could not update role'); return }
+    toast.success(role === 'admin' ? `${member.full_name} is now an admin` : `${member.full_name} is now a member`)
+    loadMembers()
+  }
+
+  async function removeMember(member: ChannelMemberInfo) {
+    const ok = await confirm({
+      title: 'Remove member',
+      message: `Remove ${member.full_name} from #${channel?.name ?? 'this channel'}?`,
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    })
+    if (!ok) return
+
+    setManagingMemberId(member.id)
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc('remove_channel_member', {
+      p_channel_id: channelId,
+      p_user_id: member.id,
+    })
+    setManagingMemberId(null)
+    if (error) { toast.error(error.message); return }
+    const result = data as { ok: boolean; error?: string }
+    if (!result.ok) { toast.error(result.error ?? 'Could not remove member'); return }
+    toast.success(`${member.full_name} removed`)
+    qc.invalidateQueries({ queryKey: ['channel-members', channelId] })
+    loadMembers()
   }
 
   function toggleMute() {
@@ -490,7 +610,13 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           </div>
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); setShowSettings(true); loadMembers() }}
+          onClick={(e) => {
+            e.stopPropagation()
+            setChannelNameDraft(channel?.name ?? '')
+            setChannelDescriptionDraft(channel?.description ?? '')
+            setShowSettings(true)
+            loadMembers()
+          }}
           className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
           title="Channel settings"
         >
@@ -519,9 +645,40 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
               <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mb-3">
                 <span className="text-violet-600 font-bold text-lg">#</span>
               </div>
-              <p className="font-semibold text-slate-900 dark:text-white">{channel?.name}</p>
-              {channel?.description && (
-                <p className="text-xs text-slate-400 mt-1">{channel.description}</p>
+              {isChannelAdmin ? (
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">Channel name</label>
+                    <input
+                      value={channelNameDraft}
+                      onChange={(e) => setChannelNameDraft(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">Description</label>
+                    <textarea
+                      value={channelDescriptionDraft}
+                      onChange={(e) => setChannelDescriptionDraft(e.target.value)}
+                      rows={2}
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  </div>
+                  <button
+                    onClick={saveChannelDetails}
+                    disabled={savingChannelDetails}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-60"
+                  >
+                    {savingChannelDetails ? 'Saving…' : 'Save details'}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="font-semibold text-slate-900 dark:text-white">{channel?.name}</p>
+                  {channel?.description && (
+                    <p className="text-xs text-slate-400 mt-1">{channel.description}</p>
+                  )}
+                </>
               )}
               <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
                 <Users size={11} /> {memberCount} {memberCount === 1 ? 'member' : 'members'}
@@ -538,12 +695,44 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                   {members.map((m) => (
                     <div key={m.id} className="flex items-center gap-2">
                       <Avatar src={m.avatar_url} name={m.full_name} size="sm" />
-                      <div className="min-w-0">
-                        <p className="text-sm text-slate-800 dark:text-slate-200 truncate">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-slate-800 dark:text-slate-200 truncate flex items-center gap-1.5">
                           {m.full_name}{m.id === user?.id ? ' (you)' : ''}
+                          <span
+                            className={cn(
+                              'text-[10px] px-1.5 py-0.5 rounded-full capitalize border',
+                              m.isOwner
+                                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                : m.role === 'admin'
+                                  ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+                            )}
+                          >
+                            {m.isOwner ? 'Owner' : m.role === 'admin' ? 'Admin' : 'Member'}
+                          </span>
                         </p>
-                        <p className="text-[11px] text-slate-400 truncate">@{m.username}</p>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          @{m.username} · {m.isOwner ? 'owner' : m.role}
+                        </p>
                       </div>
+                      {isChannelAdmin && !m.isOwner && m.id !== user?.id && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            disabled={managingMemberId === m.id}
+                            onClick={() => setMemberRole(m, m.role === 'admin' ? 'member' : 'admin')}
+                            className="text-[10px] px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                          >
+                            {m.role === 'admin' ? 'Make member' : 'Make admin'}
+                          </button>
+                          <button
+                            disabled={managingMemberId === m.id}
+                            onClick={() => removeMember(m)}
+                            className="text-[10px] px-2 py-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

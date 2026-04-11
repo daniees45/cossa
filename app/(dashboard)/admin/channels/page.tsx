@@ -65,10 +65,11 @@ export default function AdminChannelsPage() {
       const supabase = createClient()
       const { data } = await supabase
         .from('channel_join_requests')
-        .select('id, channel_id, user_id, status, request_note, reviewed_by, reviewed_at, created_at, channel:channels(id, name), user:profiles!user_id(id, full_name, username)')
+        .select('id, channel_id, user_id, status, request_note, reviewed_by, reviewed_at, created_at, channel:channels(id, name, created_by), user:profiles!user_id(id, full_name, username)')
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
-      return (data ?? []) as unknown as JoinRequest[]
+      return ((data ?? []) as unknown as (JoinRequest & { channel: { id: string; name: string; created_by: string } })[])
+        .filter((r) => r.channel.created_by === user?.id)
     },
   })
 
@@ -188,7 +189,7 @@ export default function AdminChannelsPage() {
     setSubmitting(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('channels').insert({
+      const { data: inserted, error } = await supabase.from('channels').insert({
         name: slug,
         description: form.description.trim() || null,
         type: form.type,
@@ -197,8 +198,17 @@ export default function AdminChannelsPage() {
           ? (form.private_entry_code.trim() || null)
           : null,
         created_by: user!.id,
-      })
+      }).select('id').single()
       if (error) throw error
+
+      if (inserted?.id) {
+        await supabase.from('channel_members').upsert({
+          channel_id: inserted.id,
+          user_id: user!.id,
+          role: 'admin',
+        })
+      }
+
       toast.success(`#${slug} created!`)
       cancelForm()
       qc.invalidateQueries({ queryKey: ['admin-channels'] })
@@ -460,13 +470,14 @@ export default function AdminChannelsPage() {
                 <p className="text-sm text-slate-800 dark:text-slate-200">
                   <span className="font-medium">@{r.requester.username}</span> requested <span className="font-medium">#{r.name}</span>
                 </p>
-                {r.description && <p className="text-xs text-slate-500 mt-0.5">{r.description}</p>}
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Type: <span className="capitalize">{r.type}</span>
-                  {r.type === 'private' ? ` · Join: ${r.private_join_mode}` : ''}
-                  {' · '}
-                  {formatDate(r.created_at)}
-                </p>
+                <div className="mt-1 text-xs text-slate-500 space-y-1">
+                  <p><span className="text-slate-400">Requester:</span> {r.requester.full_name} (@{r.requester.username})</p>
+                  <p><span className="text-slate-400">Created:</span> {formatDate(r.created_at)}</p>
+                  <p><span className="text-slate-400">Type:</span> <span className="capitalize">{r.type}</span></p>
+                  <p><span className="text-slate-400">Join mode:</span> {r.type === 'private' ? r.private_join_mode : 'N/A (public)'}</p>
+                  <p><span className="text-slate-400">Private code:</span> {r.type === 'private' && r.private_join_mode === 'code' ? (r.private_entry_code ?? 'None') : 'N/A'}</p>
+                  <p><span className="text-slate-400">Description:</span> {r.description?.trim() ? r.description : 'No description provided'}</p>
+                </div>
                 <div className="mt-2 flex items-center gap-1.5">
                   <button
                     disabled={reviewingCreationRequest}

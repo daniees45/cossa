@@ -189,8 +189,8 @@ BEGIN
     )
     RETURNING id INTO v_channel_id;
 
-    INSERT INTO channel_members(channel_id, user_id)
-    VALUES (v_channel_id, v_request.requested_by)
+    INSERT INTO channel_members(channel_id, user_id, role)
+    VALUES (v_channel_id, v_request.requested_by, 'admin')
     ON CONFLICT (channel_id, user_id) DO NOTHING;
 
     UPDATE channel_creation_requests

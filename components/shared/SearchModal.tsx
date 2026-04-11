@@ -30,6 +30,12 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
       setQuery('')
       setResults({ users: [], posts: [] })
       setTimeout(() => inputRef.current?.focus(), 50)
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
     }
   }, [open])
 
@@ -91,7 +97,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4">
+    <div className="fixed inset-0 z-[120] flex items-start justify-center pt-[10vh] px-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
@@ -151,7 +157,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
               {results.posts.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => navigate(`/social/${p.id}`)}
+                  onClick={() => navigate('/')}
                   className="w-full flex items-start gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition text-left"
                 >
                   <Avatar src={p.author.avatar_url} name={p.author.full_name} size="sm" />

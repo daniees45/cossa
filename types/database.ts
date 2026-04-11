@@ -711,6 +711,29 @@ export interface Database {
         }
         Returns: { ok: boolean; approved?: boolean; channel_id?: string; error?: string }
       }
+      update_channel_details: {
+        Args: {
+          p_channel_id: string
+          p_name?: string | null
+          p_description?: string | null
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      set_channel_member_role: {
+        Args: {
+          p_channel_id: string
+          p_user_id: string
+          p_role: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      remove_channel_member: {
+        Args: {
+          p_channel_id: string
+          p_user_id: string
+        }
+        Returns: { ok: boolean; error?: string; self_left?: boolean }
+      }
       log_admin_action: {
         Args: {
           p_action: string
