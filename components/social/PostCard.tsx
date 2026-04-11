@@ -200,7 +200,7 @@ function CommentSection({ postId }: { postId: string }) {
       .order('created_at', { ascending: true })
       .limit(50)
       .then(({ data }) => {
-        if (data) setComments(buildTree(data as CommentRow[]))
+        if (data) setComments(buildTree(data as unknown as CommentRow[]))
         setLoading(false)
       })
   })
@@ -234,7 +234,7 @@ function CommentSection({ postId }: { postId: string }) {
       .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
       .single()
     if (!error && data) {
-      const newComment = { ...(data as CommentRow), replies: [] }
+      const newComment = { ...(data as unknown as CommentRow), replies: [] }
       if (replyingTo) {
         setComments((prev) => prev.map((c) =>
           c.id === replyingTo.id

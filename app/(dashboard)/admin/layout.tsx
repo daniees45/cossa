@@ -10,6 +10,8 @@ const ADMIN_NAV = [
   { href: '/admin/elections', label: 'Elections' },
   { href: '/admin/channels', label: 'Channels' },
   { href: '/admin/resources', label: 'Resources' },
+  { href: '/admin/gallery', label: 'Gallery' },
+  { href: '/admin/notifications', label: 'Notifications' },
   { href: '/admin/users', label: 'Users' },
 ]
 

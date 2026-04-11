@@ -112,6 +112,8 @@ export interface Database {
           status: 'draft' | 'active' | 'closed'
           starts_at: string
           ends_at: string
+          eligible_levels: string[] | null
+          require_index_number: boolean
           created_by: string
           created_at: string
         }
@@ -123,6 +125,8 @@ export interface Database {
           status?: 'draft' | 'active' | 'closed'
           starts_at: string
           ends_at: string
+          eligible_levels?: string[] | null
+          require_index_number?: boolean
           created_by: string
           created_at?: string
         }
@@ -133,6 +137,8 @@ export interface Database {
           status?: 'draft' | 'active' | 'closed'
           starts_at?: string
           ends_at?: string
+          eligible_levels?: string[] | null
+          require_index_number?: boolean
         }
         Relationships: []
       }
@@ -153,6 +159,8 @@ export interface Database {
           position: string
           manifesto?: string | null
           photo_url?: string | null
+          department?: string | null
+          level?: string | null
           votes_count?: number
         }
         Update: {
@@ -443,7 +451,17 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      broadcast_notification: {
+        Args: {
+          p_title: string
+          p_body: string
+          p_link?: string | null
+          p_levels?: string[] | null
+        }
+        Returns: number
+      }
+    }
     Enums: Record<string, never>
   }
 }

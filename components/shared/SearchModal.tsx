@@ -66,7 +66,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
       ])
       setResults({
         users: (users ?? []) as Profile[],
-        posts: (posts ?? []) as SearchResult['posts'],
+        posts: (posts ?? []) as unknown as SearchResult['posts'],
       })
     } finally {
       setLoading(false)

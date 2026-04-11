@@ -39,7 +39,7 @@ export default function ProfilePage({ params }: { params: { username: string } }
         .eq('author_id', profile!.id)
         .order('created_at', { ascending: false })
         .limit(20)
-      return (data ?? []) as PostWithAuthor[]
+      return (data ?? []) as unknown as PostWithAuthor[]
     },
   })
 

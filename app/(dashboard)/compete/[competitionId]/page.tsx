@@ -47,7 +47,7 @@ export default function CompetitionDetailPage({ params }: { params: Promise<{ co
         .eq('competition_id', competitionId)
         .order('rank', { ascending: true, nullsFirst: false })
         .order('submitted_at', { ascending: true })
-      return (data ?? []) as (Submission & { submitter: { full_name: string; username: string; avatar_url: string | null } })[]
+      return (data ?? []) as unknown as (Submission & { submitter: { full_name: string; username: string; avatar_url: string | null } })[]
     },
   })
 

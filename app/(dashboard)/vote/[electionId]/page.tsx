@@ -42,7 +42,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
         .from('candidates')
         .select('*, profile:profiles!user_id(*)')
         .eq('election_id', electionId)
-      return (data ?? []) as CandidateWithProfile[]
+      return (data ?? []) as unknown as CandidateWithProfile[]
     },
   })
 

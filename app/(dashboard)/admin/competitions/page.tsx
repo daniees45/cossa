@@ -318,7 +318,7 @@ export default function AdminCompetitionsPage() {
             <p className="text-sm text-slate-500">No submissions yet for this competition.</p>
           ) : (
             <div className="space-y-3">
-              {(submissions as Array<{
+              {(submissions as unknown as Array<{
                 id: string
                 team_name: string | null
                 submitter: { full_name: string; username: string } | null

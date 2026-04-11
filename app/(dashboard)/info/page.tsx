@@ -33,7 +33,7 @@ export default function InfoPage() {
         .select('*, author:profiles!author_id(full_name, avatar_url)')
         .order('pinned', { ascending: false })
         .order('created_at', { ascending: false })
-      return (data ?? []) as (Announcement & { author: { full_name: string; avatar_url: string | null } })[]
+      return (data ?? []) as unknown as (Announcement & { author: { full_name: string; avatar_url: string | null } })[]
     },
   })
 

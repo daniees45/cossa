@@ -41,7 +41,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       .limit(50)
       .then(({ data }) => {
         if (data) {
-          setMessages(data as MessageWithSender[])
+          setMessages(data as unknown as MessageWithSender[])
           setHasMore(data.length === 50)
         }
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
@@ -65,7 +65,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
             .eq('id', payload.new.id)
             .single()
           if (msg) {
-            setMessages((prev) => [...prev, msg as MessageWithSender])
+            setMessages((prev) => [...prev, msg as unknown as MessageWithSender])
             setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
         }
@@ -89,7 +89,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       .limit(50)
     setLoadingOlder(false)
     if (!data || data.length === 0) { setHasMore(false); return }
-    const older = [...data].reverse() as MessageWithSender[]
+    const older = [...data].reverse() as unknown as MessageWithSender[]
     // Preserve scroll position
     const container = scrollRef.current
     const prevHeight = container?.scrollHeight ?? 0

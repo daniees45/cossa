@@ -30,7 +30,7 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
         .select('*, profile:profiles!user_id(*)')
         .eq('election_id', id)
         .order('votes_count', { ascending: false })
-      return (data ?? []) as CandidateWithProfile[]
+      return (data ?? []) as unknown as CandidateWithProfile[]
     },
   })
 

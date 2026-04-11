@@ -55,7 +55,7 @@ function CandidatePanel({ electionId }: { electionId: string }) {
         .select('*, profile:profiles!user_id(id, full_name, username, avatar_url, department, level)')
         .eq('election_id', electionId)
         .order('position')
-      return (data ?? []) as CandidateWithProfile[]
+      return (data ?? []) as unknown as CandidateWithProfile[]
     },
   })
 
@@ -117,7 +117,7 @@ function CandidatePanel({ electionId }: { electionId: string }) {
         photo_url,
         department: resolvedProfile.department,
         level: resolvedProfile.level,
-      } as never)
+      })
       if (error) {
         if (error.code === '23505') toast.error('This candidate is already in the election')
         else toast.error(error.message)
@@ -335,7 +335,7 @@ export default function AdminElectionsPage() {
         eligible_levels: data.eligible_levels?.length ? data.eligible_levels : null,
         created_by: user!.id,
         status: 'draft',
-      } as never)
+      })
       if (error) throw error
     },
     onSuccess: () => {

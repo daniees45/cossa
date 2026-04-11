@@ -37,7 +37,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       .order('created_at', { ascending: true })
       .limit(50)
       .then(({ data }) => {
-        if (data) setMessages(data as MessageWithSender[])
+        if (data) setMessages(data as unknown as MessageWithSender[])
         setTimeout(() => bottomRef.current?.scrollIntoView(), 50)
       })
 
@@ -56,7 +56,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           .eq('id', payload.new.id)
           .single()
         if (msg) {
-          setMessages((prev) => [...prev, msg as MessageWithSender])
+          setMessages((prev) => [...prev, msg as unknown as MessageWithSender])
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
         }
       })
