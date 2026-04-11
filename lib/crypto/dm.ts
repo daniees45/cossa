@@ -46,6 +46,26 @@ export async function importPublicKey(b64: string): Promise<CryptoKey> {
   )
 }
 
+async function exportPublicKeyFromPrivateKey(privateKey: CryptoKey): Promise<string> {
+  const privateJwk = await crypto.subtle.exportKey('jwk', privateKey)
+  const publicJwk: JsonWebKey = {
+    kty: privateJwk.kty,
+    crv: privateJwk.crv,
+    x: privateJwk.x,
+    y: privateJwk.y,
+    ext: true,
+    key_ops: [],
+  }
+  const publicKey = await crypto.subtle.importKey(
+    'jwk',
+    publicJwk,
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    [],
+  )
+  return exportPublicKey(publicKey)
+}
+
 // ─── Private Key: localStorage (JWK) ─────────────────────────────────────────
 
 export async function savePrivateKey(userId: string, key: CryptoKey): Promise<void> {
@@ -161,6 +181,7 @@ export function isEncrypted(content: string): boolean {
 export async function ensureKeyPair(
   userId: string,
   theirPublicKeyB64: string | null,
+  myPublicKeyB64: string | null = null,
 ): Promise<{
   myPrivate: CryptoKey
   theirPublic: CryptoKey | null
@@ -168,6 +189,20 @@ export async function ensureKeyPair(
 }> {
   let myPrivate = await loadPrivateKey(userId)
   let newPublicKeyB64: string | null = null
+
+  // Auto-heal stale local keys that no longer match the user's saved public key.
+  if (myPrivate && myPublicKeyB64) {
+    try {
+      const derivedPublicB64 = await exportPublicKeyFromPrivateKey(myPrivate)
+      if (derivedPublicB64 !== myPublicKeyB64) {
+        console.warn('Local private key mismatch detected; regenerating E2EE key pair')
+        myPrivate = null
+      }
+    } catch (error) {
+      console.warn('Failed to validate local E2EE key pair, regenerating:', error)
+      myPrivate = null
+    }
+  }
 
   if (!myPrivate) {
     const pair = await generateKeyPair()

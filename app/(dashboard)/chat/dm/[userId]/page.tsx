@@ -111,17 +111,40 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   // ── E2EE setup ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !other) return
-    ensureKeyPair(user.id, other.public_key ?? null).then(
-      async ({ myPrivate, theirPublic, newPublicKeyB64 }) => {
+    const currentUser = user
+    const otherUser = other
+    let cancelled = false
+    async function initE2EE() {
+      const supabase = createClient()
+      try {
+        const { data: me } = await supabase
+          .from('profiles')
+          .select('public_key')
+          .eq('id', currentUser.id)
+          .single()
+
+        const { myPrivate, theirPublic, newPublicKeyB64 } = await ensureKeyPair(
+          currentUser.id,
+          otherUser.public_key ?? null,
+          me?.public_key ?? null,
+        )
+
+        if (cancelled) return
+
         myPrivRef.current = myPrivate
         theirPubRef.current = theirPublic
         if (newPublicKeyB64) {
-          const supabase = createClient()
-          await supabase.from('profiles').update({ public_key: newPublicKeyB64 }).eq('id', user.id)
+          await supabase.from('profiles').update({ public_key: newPublicKeyB64 }).eq('id', currentUser.id)
         }
         setE2eActive(!!theirPublic)
-      },
-    )
+      } catch (error) {
+        console.error('Failed to initialize E2EE keys:', error)
+        if (!cancelled) setE2eActive(false)
+      }
+    }
+
+    initE2EE()
+    return () => { cancelled = true }
   }, [user, other])
 
   // ── Decrypt whenever messages change ────────────────────────────────────
@@ -142,7 +165,18 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               return { id: msg.id, content: decrypted, encrypted: true }
             } catch (error) {
               console.error(`Failed to decrypt message ${msg.id}:`, error)
-              return { id: msg.id, content: '🔒 Unable to decrypt', encrypted: true }
+              const isOperationError =
+                typeof error === 'object' &&
+                error !== null &&
+                'name' in error &&
+                String((error as { name?: string }).name) === 'OperationError'
+              return {
+                id: msg.id,
+                content: isOperationError
+                  ? '🔒 Unable to decrypt (key mismatch)'
+                  : '🔒 Unable to decrypt',
+                encrypted: true,
+              }
             }
           }
           return { id: msg.id, content: msg.content, encrypted: false }
