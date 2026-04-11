@@ -15,6 +15,8 @@ export interface Database {
           username: string
           full_name: string
           avatar_url: string | null
+          banner_url: string | null
+          avatar_frame: string
           bio: string | null
           level: string | null
           department: string | null
@@ -30,6 +32,8 @@ export interface Database {
           username: string
           full_name: string
           avatar_url?: string | null
+          banner_url?: string | null
+          avatar_frame?: string
           bio?: string | null
           level?: string | null
           department?: string | null
@@ -44,6 +48,8 @@ export interface Database {
           username?: string
           full_name?: string
           avatar_url?: string | null
+          banner_url?: string | null
+          avatar_frame?: string
           bio?: string | null
           level?: string | null
           department?: string | null
