@@ -76,13 +76,15 @@ export function Sidebar() {
 
       {/* Bottom: profile + logout */}
       <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-0.5">
-        <Link
-          href="/admin"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-        >
-          <Settings size={18} />
-          Admin
-        </Link>
+        {user && ['admin', 'super_admin'].includes(user.role) && (
+          <Link
+            href="/admin"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          >
+            <Settings size={18} />
+            Admin
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 transition"

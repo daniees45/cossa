@@ -9,6 +9,7 @@ const ADMIN_NAV = [
   { href: '/admin/competitions', label: 'Competitions' },
   { href: '/admin/elections', label: 'Elections' },
   { href: '/admin/channels', label: 'Channels' },
+  { href: '/admin/resources', label: 'Resources' },
   { href: '/admin/users', label: 'Users' },
 ]
 

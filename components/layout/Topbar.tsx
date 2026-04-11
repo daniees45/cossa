@@ -1,6 +1,8 @@
 'use client'
 import Link from 'next/link'
-import { Bell, Search } from 'lucide-react'
+import { Bell, Search, Sun, Moon } from 'lucide-react'
+import { useTheme } from '@/lib/context/ThemeProvider'
+import { SearchModal } from '@/components/shared/SearchModal'
 import { useNotificationStore } from '@/lib/stores/notificationStore'
 import { useUser } from '@/lib/hooks/useUser'
 import { getInitials } from '@/lib/utils/uploadFile'
@@ -15,8 +17,21 @@ export function Topbar() {
   const { unreadCount, notifications, markAllRead, markOneRead, setNotifications } = useNotificationStore()
   const { user } = useUser()
   const [open, setOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  // Cmd+K / Ctrl+K shortcut to open search
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   // Load notifications on mount
   useEffect(() => {
@@ -63,16 +78,20 @@ export function Topbar() {
       </div>
 
       {/* Search */}
-      <div className="flex-1 max-w-xs hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2">
+      <div
+        onClick={() => setSearchOpen(true)}
+        className="flex-1 max-w-xs hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+      >
         <Search size={15} className="text-slate-400 shrink-0" />
-        <input
-          type="text"
-          placeholder="Search..."
-          className="bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 outline-none w-full"
-        />
+        <span className="text-sm text-slate-400 flex-1">Search…</span>
+        <kbd className="hidden lg:inline text-[10px] text-slate-400 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">⌘K</kbd>
       </div>
 
+      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+
       <div className="ml-auto flex items-center gap-3">
+        {/* Dark mode toggle */}
+        <ThemeToggle />
         {/* Notification Bell */}
         <div className="relative" ref={ref}>
           <button
@@ -141,5 +160,18 @@ export function Topbar() {
         )}
       </div>
     </header>
+  )
+}
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme()
+  return (
+    <button
+      onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+      className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-500 dark:text-slate-400"
+      title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
   )
 }
