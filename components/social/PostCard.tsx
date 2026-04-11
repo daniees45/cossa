@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh } from 'lucide-react'
+import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh, Flag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/shared/Avatar'
@@ -24,6 +24,10 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const [showComments, setShowComments] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showReport, setShowReport] = useState(false)
+  const [reportReason, setReportReason] = useState<string>('')
+  const [reportNote, setReportNote] = useState('')
+  const [reporting, setReporting] = useState(false)
 
   // Sync when React Query cache is updated by realtime (likes/comments from others)
   useEffect(() => { setLikes(post.likes_count) }, [post.likes_count])
@@ -70,6 +74,31 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
     toast.success('Link copied!')
   }
 
+  async function submitReport() {
+    if (!user || !reportReason) return
+    setReporting(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('post_reports' as any).insert({
+        post_id: post.id,
+        reporter_id: user.id,
+        reason: reportReason,
+        note: reportNote.trim() || null,
+      })
+      if (error) {
+        if (error.code === '23505') toast.error('You already reported this post')
+        else toast.error(error.message)
+        return
+      }
+      toast.success('Report submitted — thank you')
+      setShowReport(false)
+      setReportReason('')
+      setReportNote('')
+    } finally {
+      setReporting(false)
+    }
+  }
+
   return (
     <article className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
       {/* Pinned banner */}
@@ -103,18 +132,28 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
               <p className="text-xs text-slate-400 mt-0.5">@{post.author.username} · {timeAgo(post.created_at)}</p>
             </div>
           </Link>
-          {user?.id === post.author_id && (
+          {user && (
             <div className="relative group">
               <button className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 transition">
                 <MoreHorizontal size={16} />
               </button>
-              <div className="absolute right-0 top-8 hidden group-focus-within:block bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg py-1 z-10 min-w-32">
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
-                >
-                  <Trash2 size={13} /> Delete
-                </button>
+              <div className="absolute right-0 top-8 hidden group-focus-within:block bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg py-1 z-10 min-w-36">
+                {user.id === post.author_id && (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                )}
+                {user.id !== post.author_id && (
+                  <button
+                    onClick={() => setShowReport(true)}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2"
+                  >
+                    <Flag size={13} /> Report post
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -186,6 +225,62 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
       {/* Comments section */}
       {showComments && (
         <CommentSection postId={post.id} onCommentAdded={() => setCommentsCount((c) => c + 1)} />
+      )}
+
+      {/* Report modal */}
+      {showReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowReport(false)} />
+          <div className="relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm shadow-2xl">
+            <button onClick={() => setShowReport(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+              <X size={16} />
+            </button>
+            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
+              <Flag size={18} className="text-amber-600" />
+            </div>
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Report post</h3>
+            <p className="text-sm text-slate-500 mb-4">Why are you reporting this post?</p>
+            <div className="space-y-2 mb-4">
+              {(['spam','inappropriate','harassment','misinformation','other'] as const).map((r) => (
+                <label key={r} className="flex items-center gap-2.5 cursor-pointer group">
+                  <input
+                    type="radio"
+                    name="report-reason"
+                    value={r}
+                    checked={reportReason === r}
+                    onChange={() => setReportReason(r)}
+                    className="accent-violet-600"
+                  />
+                  <span className="text-sm text-slate-700 dark:text-slate-300 capitalize group-hover:text-slate-900 dark:group-hover:text-white transition">
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <textarea
+              value={reportNote}
+              onChange={(e) => setReportNote(e.target.value)}
+              placeholder="Additional details (optional)"
+              rows={2}
+              className="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-violet-500 resize-none mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={submitReport}
+                disabled={!reportReason || reporting}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-xl transition"
+              >
+                {reporting ? 'Submitting…' : 'Submit report'}
+              </button>
+              <button
+                onClick={() => setShowReport(false)}
+                className="flex-1 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete confirmation */}

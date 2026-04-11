@@ -10,7 +10,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { Badge } from '@/components/shared/Badge'
 import { Avatar } from '@/components/shared/Avatar'
-import { Plus, Loader2, Trash2, Users, ChevronDown, ChevronUp, Camera, Search, ShieldCheck, ClipboardList, X } from 'lucide-react'
+import { Plus, Loader2, Trash2, Users, ChevronDown, ChevronUp, Camera, Search, ShieldCheck, ClipboardList, X, Vote } from 'lucide-react'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { formatEventDate } from '@/lib/utils/formatDate'
 import type { Election, CandidateWithProfile } from '@/types/app'
@@ -697,6 +697,11 @@ export default function AdminElectionsPage() {
                     <Badge variant={el.status === 'active' ? 'success' : el.status === 'closed' ? 'default' : 'warning'}>
                       {el.status}
                     </Badge>
+                    {el.status === 'active' && (
+                      <span className="flex items-center gap-1 text-[10px] font-bold bg-green-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                        ● VOTING LIVE
+                      </span>
+                    )}
                     {el.require_index_number && (
                       <span className="flex items-center gap-1 text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
                         <ShieldCheck size={10} /> Index required
@@ -733,17 +738,25 @@ export default function AdminElectionsPage() {
                   {el.status === 'draft' && (
                     <button
                       onClick={() => changeStatus({ id: el.id, status: 'active' })}
-                      className="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-medium"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-semibold transition"
                     >
-                      Activate
+                      <Vote size={12} /> Enable Voting
                     </button>
                   )}
                   {el.status === 'active' && (
                     <button
                       onClick={() => changeStatus({ id: el.id, status: 'closed' })}
-                      className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 text-xs font-medium"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 text-xs font-semibold transition"
                     >
-                      Close
+                      <Vote size={12} /> Stop Voting
+                    </button>
+                  )}
+                  {el.status === 'closed' && (
+                    <button
+                      onClick={() => changeStatus({ id: el.id, status: 'active' })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-semibold transition"
+                    >
+                      <Vote size={12} /> Reopen
                     </button>
                   )}
                   <button
