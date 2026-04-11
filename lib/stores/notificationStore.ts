@@ -8,6 +8,7 @@ interface NotificationState {
   setNotifications: (n: Notification[]) => void
   addNotification: (n: Notification) => void
   markAllRead: () => void
+  markOneRead: (id: string) => void
 }
 
 export const useNotificationStore = create<NotificationState>((set) => ({
@@ -28,4 +29,12 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       notifications: state.notifications.map((n) => ({ ...n, read: true })),
       unreadCount: 0,
     })),
+  markOneRead: (id: string) =>
+    set((state) => {
+      const wasUnread = state.notifications.find((n) => n.id === id && !n.read)
+      return {
+        notifications: state.notifications.map((n) => n.id === id ? { ...n, read: true } : n),
+        unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount,
+      }
+    }),
 }))

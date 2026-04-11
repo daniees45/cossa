@@ -12,7 +12,7 @@ import { timeAgo } from '@/lib/utils/formatDate'
 import type { Notification } from '@/types/app'
 
 export function Topbar() {
-  const { unreadCount, notifications, markAllRead, setNotifications } = useNotificationStore()
+  const { unreadCount, notifications, markAllRead, markOneRead, setNotifications } = useNotificationStore()
   const { user } = useUser()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -104,7 +104,15 @@ export function Topbar() {
                 {notifications.map((n) => (
                   <div
                     key={n.id}
-                    onClick={() => { if (n.link) router.push(n.link); setOpen(false) }}
+                    onClick={async () => {
+                      if (!n.read) {
+                        markOneRead(n.id)
+                        const supabase = createClient()
+                        await supabase.from('notifications').update({ read: true }).eq('id', n.id)
+                      }
+                      if (n.link) router.push(n.link)
+                      setOpen(false)
+                    }}
                     className={cn(
                       'flex gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition',
                       !n.read && 'bg-violet-50 dark:bg-violet-900/10'
