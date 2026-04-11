@@ -5,11 +5,16 @@ import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import { Badge } from '@/components/shared/Badge'
 import { toast } from 'sonner'
-import { Loader2, CheckCircle2 } from 'lucide-react'
+import { Loader2, CheckCircle2, ShieldX, ShieldCheck } from 'lucide-react'
 import { countdown } from '@/lib/utils/formatDate'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CandidateWithProfile, Election } from '@/types/app'
+
+type ElectionWithEligibility = Election & {
+  eligible_levels: string[] | null
+  require_index_number: boolean
+}
 
 export default function VoteBallotPage({ params }: { params: { electionId: string } }) {
   const { electionId } = params
@@ -24,7 +29,7 @@ export default function VoteBallotPage({ params }: { params: { electionId: strin
     queryFn: async () => {
       const supabase = createClient()
       const { data } = await supabase.from('elections').select('*').eq('id', electionId).single()
-      return data as Election
+      return data as ElectionWithEligibility
     },
   })
 
@@ -79,6 +84,48 @@ export default function VoteBallotPage({ params }: { params: { electionId: strin
 
   // Group candidates by position
   const positions = [...new Set(candidates?.map((c) => c.position) ?? [])]
+
+  // Eligibility check
+  const eligibilityError = (() => {
+    if (!election || !user) return null
+    const e = election as ElectionWithEligibility
+    if (e.require_index_number && !(user as never as { index_number: string | null }).index_number) {
+      return 'You must add your student index number to your profile before voting in this election.'
+    }
+    if (e.eligible_levels && e.eligible_levels.length > 0) {
+      const userLevel = (user as never as { level: string | null }).level
+      if (!userLevel || !e.eligible_levels.includes(userLevel)) {
+        const readable = e.eligible_levels.map((l) => l === 'postgrad' ? 'Postgrad' : `${l} Level`).join(', ')
+        return `This election is restricted to ${readable} students. Your profile level does not match.`
+      }
+    }
+    return null
+  })()
+
+  if (eligibilityError) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+        <ShieldX size={48} className="text-red-400 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Not eligible to vote</h2>
+        <p className="text-slate-500 text-sm mb-6">{eligibilityError}</p>
+        {election && (
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 text-left space-y-2">
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+              <ShieldCheck size={12} className="text-violet-500" /> Eligibility requirements
+            </p>
+            {(election as ElectionWithEligibility).require_index_number && (
+              <p className="text-sm text-slate-700 dark:text-slate-300">• Index number must be set in your profile</p>
+            )}
+            {(election as ElectionWithEligibility).eligible_levels?.length ? (
+              <p className="text-sm text-slate-700 dark:text-slate-300">
+                • Restricted to: {(election as ElectionWithEligibility).eligible_levels!.map((l) => l === 'postgrad' ? 'Postgrad' : `${l} Level`).join(', ')}
+              </p>
+            ) : null}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   if (hasVoted) {
     return (

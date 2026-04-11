@@ -4,9 +4,14 @@ import { createClient } from '@/lib/supabase/client'
 import { countdown, formatEventDate } from '@/lib/utils/formatDate'
 import { Badge } from '@/components/shared/Badge'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { Vote, Clock, ChevronRight } from 'lucide-react'
+import { Vote, Clock, ChevronRight, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import type { Election } from '@/types/app'
+
+type ElectionWithEligibility = Election & {
+  eligible_levels: string[] | null
+  require_index_number: boolean
+}
 
 export default function VotePage() {
   const { data: elections, isLoading } = useQuery({
@@ -18,7 +23,7 @@ export default function VotePage() {
         .select('*')
         .neq('status', 'draft')
         .order('starts_at', { ascending: false })
-      return (data ?? []) as Election[]
+      return (data ?? []) as ElectionWithEligibility[]
     },
   })
 
@@ -73,7 +78,7 @@ export default function VotePage() {
   )
 }
 
-function ElectionCard({ election }: { election: Election }) {
+function ElectionCard({ election }: { election: ElectionWithEligibility }) {
   const isActive = election.status === 'active'
   const isClosed = election.status === 'closed'
 
@@ -90,10 +95,20 @@ function ElectionCard({ election }: { election: Election }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant={isActive ? 'success' : isClosed ? 'default' : 'warning'}>
                 {election.status.charAt(0).toUpperCase() + election.status.slice(1)}
               </Badge>
+              {election.require_index_number && (
+                <span className="flex items-center gap-1 text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">
+                  <ShieldCheck size={10} /> Index required
+                </span>
+              )}
+              {election.eligible_levels && election.eligible_levels.length > 0 && (
+                <span className="text-[10px] bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 px-2 py-0.5 rounded-full">
+                  {election.eligible_levels.map((l) => l === 'postgrad' ? 'PG' : `${l}L`).join(', ')} only
+                </span>
+              )}
             </div>
             <h3 className="font-semibold text-slate-900 dark:text-white">{election.title}</h3>
             {election.description && (
