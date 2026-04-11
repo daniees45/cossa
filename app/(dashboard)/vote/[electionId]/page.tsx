@@ -151,16 +151,15 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
   const { mutate: castVotes, isPending } = useMutation({
     mutationFn: async () => {
       const supabase = createClient()
-      const entries = Object.entries(selected)
-      if (entries.length === 0) throw new Error('Select candidates before voting')
-      for (const [, candidateId] of entries) {
-        const { error } = await supabase.from('votes').insert({
-          election_id: electionId,
-          candidate_id: candidateId,
-          voter_id: user!.id,
-        })
-        if (error) throw error
-      }
+      const candidateIds = Object.values(selected)
+      if (candidateIds.length === 0) throw new Error('Select candidates before voting')
+      const { data, error } = await supabase.rpc('cast_ballot', {
+        p_election_id: electionId,
+        p_candidate_ids: candidateIds,
+      })
+      if (error) throw error
+      const result = data as { ok: boolean; error?: string }
+      if (!result.ok) throw new Error(result.error ?? 'Could not cast vote')
     },
     onSuccess: () => {
       toast.success('Vote cast successfully!')

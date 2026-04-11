@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -19,6 +19,14 @@ type FormData = z.infer<typeof schema>
 export default function LoginPage() {
   const router = useRouter()
   const [showPass, setShowPass] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('banned') === '1') {
+      toast.error('Your account is restricted. Contact admin support.')
+    }
+  }, [])
+
   const {
     register,
     handleSubmit,
@@ -48,6 +56,22 @@ export default function LoginPage() {
       toast.error('Invalid username or password')
       return
     }
+
+    const { data: authData } = await supabase.auth.getUser()
+    if (authData.user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_banned')
+        .eq('id', authData.user.id)
+        .single()
+
+      if (profile?.is_banned) {
+        await supabase.auth.signOut()
+        toast.error('Your account is restricted. Contact admin support.')
+        return
+      }
+    }
+
     router.push('/')
     router.refresh()
   }

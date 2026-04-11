@@ -21,6 +21,8 @@ export interface Database {
           role: 'student' | 'admin' | 'super_admin'
           index_number: string | null
           public_key: string | null
+          is_banned: boolean
+          ban_reason: string | null
           created_at: string
         }
         Insert: {
@@ -34,6 +36,8 @@ export interface Database {
           role?: 'student' | 'admin' | 'super_admin'
           index_number?: string | null
           public_key?: string | null
+          is_banned?: boolean
+          ban_reason?: string | null
           created_at?: string
         }
         Update: {
@@ -46,6 +50,8 @@ export interface Database {
           role?: 'student' | 'admin' | 'super_admin'
           index_number?: string | null
           public_key?: string | null
+          is_banned?: boolean
+          ban_reason?: string | null
         }
         Relationships: []
       }
@@ -110,6 +116,32 @@ export interface Database {
           created_at?: string
         }
         Update: { content?: string }
+        Relationships: []
+      }
+      post_reports: {
+        Row: {
+          id: string
+          post_id: string
+          reporter_id: string
+          reason: 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other'
+          note: string | null
+          status: 'pending' | 'reviewed' | 'dismissed'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          reporter_id: string
+          reason: 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other'
+          note?: string | null
+          status?: 'pending' | 'reviewed' | 'dismissed'
+          created_at?: string
+        }
+        Update: {
+          reason?: 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other'
+          note?: string | null
+          status?: 'pending' | 'reviewed' | 'dismissed'
+        }
         Relationships: []
       }
       elections: {
@@ -534,6 +566,13 @@ export interface Database {
           p_user_id:     string
         }
         Returns: { ok: boolean; error?: string; name?: string }
+      }
+      cast_ballot: {
+        Args: {
+          p_election_id: string
+          p_candidate_ids: string[]
+        }
+        Returns: { ok: boolean; error?: string; count?: number }
       }
     }
     Enums: Record<string, never>

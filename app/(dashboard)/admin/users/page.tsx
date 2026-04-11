@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { Search, ShieldBan, ShieldCheck, Flag, X, ChevronDown } from 'lucide-react'
 import { timeAgo } from '@/lib/utils/formatDate'
 import type { Profile } from '@/types/app'
+import type { Database } from '@/types/database'
 
 type Role = 'student' | 'admin' | 'super_admin'
 type Tab = 'users' | 'reports'
@@ -27,6 +28,8 @@ type ReportRow = {
   reported_user: { id: string; full_name: string; username: string; avatar_url: string | null; is_banned: boolean }
   post_content: string | null
 }
+
+type PostReport = Database['public']['Tables']['post_reports']['Row']
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useUser()
@@ -47,7 +50,7 @@ export default function AdminUsersPage() {
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false })
-      return (data ?? []) as unknown as (Profile & { is_banned: boolean; ban_reason: string | null })[]
+      return (data ?? []) as Profile[]
     },
   })
 
@@ -58,31 +61,31 @@ export default function AdminUsersPage() {
       const supabase = createClient()
       // Step 1: get reports + reporter profile
       const { data: rdata } = await supabase
-        .from('post_reports' as any)
+        .from('post_reports')
         .select('id, reason, note, status, created_at, post_id, reporter_id')
         .order('created_at', { ascending: false })
       if (!rdata?.length) return [] as ReportRow[]
 
       // Step 2: get posts (content)
-      const postIds = [...new Set((rdata as any[]).map((r: any) => r.post_id))]
+      const postIds = [...new Set(rdata.map((r) => r.post_id))]
       const { data: posts } = await supabase
         .from('posts')
         .select('id, content, author_id')
         .in('id', postIds)
 
       // Step 3: get all relevant profiles
-      const reporterIds = [...new Set((rdata as any[]).map((r: any) => r.reporter_id))]
+      const reporterIds = [...new Set(rdata.map((r) => r.reporter_id))]
       const authorIds = [...new Set((posts ?? []).map((p) => p.author_id))]
       const allIds = [...new Set([...reporterIds, ...authorIds])]
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, full_name, username, avatar_url')
+        .select('id, full_name, username, avatar_url, is_banned')
         .in('id', allIds)
 
-      const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p as any]))
+      const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]))
       const postMap    = Object.fromEntries((posts ?? []).map((p) => [p.id, p]))
 
-      return (rdata as any[]).map((r: any) => {
+      return (rdata as PostReport[]).map((r) => {
         const post = postMap[r.post_id]
         return {
           id: r.id,
@@ -115,7 +118,7 @@ export default function AdminUsersPage() {
       const supabase = createClient()
       const { error } = await supabase
         .from('profiles')
-        .update({ is_banned, ban_reason: is_banned ? (ban_reason ?? null) : null } as any)
+        .update({ is_banned, ban_reason: is_banned ? (ban_reason ?? null) : null })
         .eq('id', id)
       if (error) throw error
     },
@@ -132,7 +135,7 @@ export default function AdminUsersPage() {
   const { mutate: updateReportStatus } = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: 'reviewed' | 'dismissed' }) => {
       const supabase = createClient()
-      const { error } = await supabase.from('post_reports' as any).update({ status }).eq('id', id)
+      const { error } = await supabase.from('post_reports').update({ status }).eq('id', id)
       if (error) throw error
     },
     onSuccess: () => { toast.success('Report updated'); refetchReports() },
@@ -142,7 +145,7 @@ export default function AdminUsersPage() {
   const { mutate: deleteReport } = useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient()
-      await supabase.from('post_reports' as any).delete().eq('id', id)
+      await supabase.from('post_reports').delete().eq('id', id)
     },
     onSuccess: () => { toast.success('Report deleted'); refetchReports() },
   })

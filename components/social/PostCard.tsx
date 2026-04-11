@@ -15,6 +15,8 @@ interface PostCardProps {
   onDeleted?: (id: string) => void
 }
 
+type ReportReason = 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other'
+
 export function PostCard({ post, onDeleted }: PostCardProps) {
   const { user } = useUser()
   const [liked, setLiked] = useState(post.liked_by_me ?? false)
@@ -25,7 +27,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showReport, setShowReport] = useState(false)
-  const [reportReason, setReportReason] = useState<string>('')
+  const [reportReason, setReportReason] = useState<ReportReason | ''>('')
   const [reportNote, setReportNote] = useState('')
   const [reporting, setReporting] = useState(false)
 
@@ -79,7 +81,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
     setReporting(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('post_reports' as any).insert({
+      const { error } = await supabase.from('post_reports').insert({
         post_id: post.id,
         reporter_id: user.id,
         reason: reportReason,
@@ -241,7 +243,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Report post</h3>
             <p className="text-sm text-slate-500 mb-4">Why are you reporting this post?</p>
             <div className="space-y-2 mb-4">
-              {(['spam','inappropriate','harassment','misinformation','other'] as const).map((r) => (
+              {(['spam', 'inappropriate', 'harassment', 'misinformation', 'other'] as const satisfies ReadonlyArray<ReportReason>).map((r) => (
                 <label key={r} className="flex items-center gap-2.5 cursor-pointer group">
                   <input
                     type="radio"

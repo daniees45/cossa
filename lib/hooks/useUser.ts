@@ -21,6 +21,12 @@ export function useUser() {
         .select('*')
         .eq('id', authUser.id)
         .single()
+      if (data?.is_banned) {
+        await supabase.auth.signOut()
+        setUser(null)
+        setLoading(false)
+        return
+      }
       if (data) setUser(data as Profile)
       setLoading(false)
     })
