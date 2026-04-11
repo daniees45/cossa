@@ -351,6 +351,24 @@ export interface Database {
         Update: { role?: string }
         Relationships: []
       }
+      message_reactions: {
+        Row: {
+          id: string
+          message_id: string
+          user_id: string
+          emoji: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          user_id: string
+          emoji: string
+          created_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
       messages: {
         Row: {
           id: string
@@ -360,6 +378,7 @@ export interface Database {
           content: string
           media_url: string | null
           read_at: string | null
+          edited_at: string | null
           created_at: string
         }
         Insert: {
@@ -370,9 +389,15 @@ export interface Database {
           content: string
           media_url?: string | null
           read_at?: string | null
+          edited_at?: string | null
           created_at?: string
         }
-        Update: { read_at?: string | null }
+        Update: {
+          content?: string
+          media_url?: string | null
+          read_at?: string | null
+          edited_at?: string | null
+        }
         Relationships: []
       }
       competitions: {

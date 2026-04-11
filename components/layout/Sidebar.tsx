@@ -34,6 +34,7 @@ export function Sidebar() {
   const router = useRouter()
   const { user } = useUser()
   const { dmUnread, clearDmUnread } = useChatStore()
+  const totalDmUnread = Object.values(dmUnread).reduce((a, b) => a + b, 0)
 
   // Clear DM unread badge when user navigates into chat
   useEffect(() => {
@@ -78,7 +79,7 @@ export function Sidebar() {
             >
               <Icon size={18} className={active ? 'text-violet-600' : 'opacity-70 group-hover:opacity-100'} />
               {label}
-              {href === '/chat' && dmUnread > 0 && !active && (
+              {href === '/chat' && totalDmUnread > 0 && !active && (
                 <span className="ml-auto w-2 h-2 rounded-full bg-red-500 shrink-0" />
               )}
               {active && <ChevronRight size={14} className="ml-auto text-violet-500" />}

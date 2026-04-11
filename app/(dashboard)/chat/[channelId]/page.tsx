@@ -4,22 +4,52 @@ import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
-import { Send, ArrowLeft, Paperclip } from 'lucide-react'
+import {
+  Send, ArrowLeft, Paperclip, Smile, Pencil, Trash2, X,
+} from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { timeAgo } from '@/lib/utils/formatDate'
 import type { Channel, MessageWithSender } from '@/types/app'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import Link from 'next/link'
+import { useChatStore } from '@/lib/stores/chatStore'
+
+const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
+type Reaction = { emoji: string; count: number; byMe: boolean }
 
 export default function ChannelPage({ params }: { params: Promise<{ channelId: string }> }) {
   const { channelId } = use(params)
   const { user } = useUser()
+  const { setChannelUnread } = useChatStore()
+
   const [messages, setMessages] = useState<MessageWithSender[]>([])
+  const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
+
+  // File attachment
+  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+
+  // Edit / delete
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+
+  // Reactions
+  const [pickerFor, setPickerFor] = useState<string | null>(null)
+
+  // Typing indicator
+  const [typingUsers, setTypingUsers] = useState<string[]>([])
+  const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const lastTypeBroadcastRef = useRef(0)
+  const typingChRef = useRef<RealtimeChannel | null>(null)
+
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { data: channel } = useQuery({
     queryKey: ['channel', channelId],
@@ -30,9 +60,39 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     },
   })
 
-  // Load initial messages
+  // Mark channel as read on mount
   useEffect(() => {
+    setChannelUnread(channelId, false)
+  }, [channelId, setChannelUnread])
+
+  // Load reactions for message IDs
+  async function loadReactions(messageIds: string[]) {
+    if (!messageIds.length || !user) return
     const supabase = createClient()
+    const { data } = await supabase
+      .from('message_reactions')
+      .select('message_id, emoji, user_id')
+      .in('message_id', messageIds)
+    if (!data) return
+    const map: Record<string, Reaction[]> = {}
+    for (const r of data) {
+      if (!map[r.message_id]) map[r.message_id] = []
+      const ex = map[r.message_id].find((x) => x.emoji === r.emoji)
+      if (ex) {
+        ex.count++
+        if (r.user_id === user.id) ex.byMe = true
+      } else {
+        map[r.message_id].push({ emoji: r.emoji, count: 1, byMe: r.user_id === user.id })
+      }
+    }
+    setReactions((prev) => ({ ...prev, ...map }))
+  }
+
+  // Load initial messages + realtime subscription
+  useEffect(() => {
+    if (!user) return
+    const supabase = createClient()
+
     supabase
       .from('messages')
       .select('*, sender:profiles!sender_id(*)')
@@ -41,23 +101,19 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       .limit(50)
       .then(({ data }) => {
         if (data) {
-          setMessages(data as unknown as MessageWithSender[])
+          const msgs = data as unknown as MessageWithSender[]
+          setMessages(msgs)
           setHasMore(data.length === 50)
+          loadReactions(msgs.map((m) => m.id))
         }
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       })
 
-    // Realtime subscription
-    const channel = supabase
+    const ch = supabase
       .channel(`channel-${channelId}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `channel_id=eq.${channelId}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
         async (payload) => {
           const { data: msg } = await supabase
             .from('messages')
@@ -68,12 +124,66 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
             setMessages((prev) => [...prev, msg as unknown as MessageWithSender])
             setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
-        }
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
+        (payload) => {
+          const u = payload.new as { id: string; content: string; edited_at: string | null }
+          setMessages((prev) =>
+            prev.map((m) => m.id === u.id ? { ...m, content: u.content, edited_at: u.edited_at ?? null } : m),
+          )
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages' },
+        (payload) => {
+          const id = (payload.old as { id: string }).id
+          setMessages((prev) => prev.filter((m) => m.id !== id))
+          setReactions((prev) => { const { [id]: _, ...rest } = prev; return rest })
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          const msgId =
+            (payload.new as { message_id?: string } | undefined)?.message_id ??
+            (payload.old as { message_id?: string } | undefined)?.message_id
+          if (!msgId) return
+          setMessages((prev) => {
+            if (prev.find((m) => m.id === msgId)) loadReactions([msgId])
+            return prev
+          })
+        },
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-  }, [channelId])
+    // Typing broadcast channel
+    const typingCh = supabase
+      .channel(`typing-ch-${channelId}`)
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        const { userId: typingId, name } = payload.payload ?? {}
+        if (!typingId || typingId === user.id) return
+        setTypingUsers((prev) => (prev.includes(name) ? prev : [...prev, name]))
+        if (typingTimeoutsRef.current[typingId]) clearTimeout(typingTimeoutsRef.current[typingId])
+        typingTimeoutsRef.current[typingId] = setTimeout(() => {
+          setTypingUsers((prev) => prev.filter((n) => n !== name))
+          delete typingTimeoutsRef.current[typingId]
+        }, 3000)
+      })
+      .subscribe()
+    typingChRef.current = typingCh
+
+    return () => {
+      supabase.removeChannel(ch)
+      supabase.removeChannel(typingCh)
+      Object.values(typingTimeoutsRef.current).forEach(clearTimeout)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId, user])
 
   async function loadOlderMessages() {
     if (!messages.length || loadingOlder) return
@@ -90,11 +200,11 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     setLoadingOlder(false)
     if (!data || data.length === 0) { setHasMore(false); return }
     const older = [...data].reverse() as unknown as MessageWithSender[]
-    // Preserve scroll position
     const container = scrollRef.current
     const prevHeight = container?.scrollHeight ?? 0
     setMessages((prev) => [...older, ...prev])
     setHasMore(data.length === 50)
+    loadReactions(older.map((m) => m.id))
     requestAnimationFrame(() => {
       if (container) container.scrollTop = container.scrollHeight - prevHeight
     })
@@ -102,26 +212,103 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
-    if (!text.trim() || !user || sending) return
+    if ((!text.trim() && !mediaFile) || !user || sending || uploading) return
     setSending(true)
+
+    let mediaUrl: string | null = null
+    if (mediaFile) {
+      setUploading(true)
+      const supabase = createClient()
+      const ext = mediaFile.name.split('.').pop()?.toLowerCase() ?? 'bin'
+      const path = `${user.id}/${Date.now()}.${ext}`
+      const { error } = await supabase.storage.from('chat-media').upload(path, mediaFile)
+      if (!error) {
+        const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(path)
+        mediaUrl = publicUrl
+      }
+      setUploading(false)
+      setMediaFile(null)
+      setMediaPreview(null)
+    }
+
     const supabase = createClient()
     await supabase.from('messages').insert({
       channel_id: channelId,
       sender_id: user.id,
-      content: text.trim(),
+      content: text.trim() || ' ',
+      media_url: mediaUrl,
     })
     setText('')
     setSending(false)
   }
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setMediaFile(file)
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = (ev) => setMediaPreview(ev.target?.result as string)
+      reader.readAsDataURL(file)
+    } else {
+      setMediaPreview(null)
+    }
+    e.target.value = ''
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setText(e.target.value)
+    const now = Date.now()
+    if (now - lastTypeBroadcastRef.current > 2000 && typingChRef.current) {
+      lastTypeBroadcastRef.current = now
+      typingChRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: user?.id, name: user?.full_name?.split(' ')[0] ?? 'Someone' },
+      })
+    }
+  }
+
+  function startEdit(msg: MessageWithSender) {
+    setEditingId(msg.id)
+    setEditText(msg.content)
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingId || !editText.trim()) return
+    const supabase = createClient()
+    await supabase.from('messages').update({ content: editText.trim(), edited_at: new Date().toISOString() }).eq('id', editingId)
+    setEditingId(null)
+    setEditText('')
+  }
+
+  async function deleteMessage(id: string) {
+    const supabase = createClient()
+    await supabase.from('messages').delete().eq('id', id)
+  }
+
+  async function toggleReaction(messageId: string, emoji: string) {
+    if (!user) return
+    const supabase = createClient()
+    const ex = (reactions[messageId] ?? []).find((r) => r.emoji === emoji)
+    if (ex?.byMe) {
+      await supabase.from('message_reactions').delete()
+        .eq('message_id', messageId).eq('user_id', user.id).eq('emoji', emoji)
+    } else {
+      await supabase.from('message_reactions').insert({ message_id: messageId, user_id: user.id, emoji })
+    }
+    setPickerFor(null)
+  }
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onClick={() => setPickerFor(null)}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
         <Link href="/chat" className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
           <ArrowLeft size={18} className="text-slate-600 dark:text-slate-300" />
         </Link>
-        <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
           <span className="text-violet-600 font-bold text-xs">#</span>
         </div>
         <div>
@@ -145,54 +332,233 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
             </button>
           </div>
         )}
+
         {messages.map((msg, i) => {
           const isOwn = msg.sender_id === user?.id
           const prevMsg = messages[i - 1]
-          const grouped = prevMsg && prevMsg.sender_id === msg.sender_id &&
+          const grouped =
+            prevMsg &&
+            prevMsg.sender_id === msg.sender_id &&
             new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() < 60000
+          const msgReactions = reactions[msg.id] ?? []
 
           return (
-            <div key={msg.id} className={cn('flex gap-2.5', isOwn && 'flex-row-reverse', grouped && 'mt-0.5')}>
+            <div
+              key={msg.id}
+              className={cn('group flex items-end gap-1', isOwn && 'flex-row-reverse', grouped && 'mt-0.5')}
+            >
+              {/* Avatar */}
               {!grouped ? (
-                <Avatar src={msg.sender.avatar_url} name={msg.sender.full_name} size="sm" className="mt-1 shrink-0" />
+                <Avatar src={msg.sender.avatar_url} name={msg.sender.full_name} size="sm" className="mb-0.5 shrink-0" />
               ) : (
                 <div className="w-7 shrink-0" />
               )}
-              <div className={cn('max-w-[75%]', isOwn && 'items-end flex flex-col')}>
+
+              <div className={cn('max-w-[70%]', isOwn && 'items-end flex flex-col')}>
                 {!grouped && (
-                  <p className="text-xs text-slate-400 mb-1">
+                  <p className="text-xs text-slate-400 mb-1 px-1">
                     {isOwn ? 'You' : msg.sender.full_name} · {timeAgo(msg.created_at)}
                   </p>
                 )}
-                <div className={cn(
-                  'px-3 py-2 rounded-2xl text-sm',
-                  isOwn
-                    ? 'bg-violet-600 text-white rounded-tr-sm'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-sm'
-                )}>
-                  {msg.content}
+
+                {editingId === msg.id ? (
+                  <form onSubmit={saveEdit} className="w-full min-w-[220px]">
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500 resize-none text-slate-800 dark:text-slate-200"
+                      rows={2}
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Escape') { setEditingId(null); setEditText('') } }}
+                    />
+                    <div className="flex gap-2 mt-1 justify-end">
+                      <button type="button" onClick={() => { setEditingId(null); setEditText('') }} className="text-xs text-slate-400 hover:text-slate-600">Cancel</button>
+                      <button type="submit" className="text-xs text-violet-600 hover:text-violet-500 font-medium">Save</button>
+                    </div>
+                  </form>
+                ) : (
+                  <div
+                    className={cn(
+                      'rounded-2xl text-sm',
+                      isOwn
+                        ? 'bg-violet-600 text-white rounded-tr-sm'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-sm',
+                    )}
+                  >
+                    {msg.media_url && (
+                      <div className="p-2 pb-0">
+                        {/\.(jpg|jpeg|png|gif|webp)$/i.test(msg.media_url) ? (
+                          <img
+                            src={msg.media_url}
+                            alt="attachment"
+                            className="max-w-full rounded-xl cursor-pointer"
+                            onClick={(e) => { e.stopPropagation(); window.open(msg.media_url!) }}
+                          />
+                        ) : (
+                          <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className={cn('flex items-center gap-1.5 text-xs underline py-1 px-1', isOwn ? 'text-violet-200' : 'text-slate-500')}>
+                            <Paperclip size={11} /> Attachment
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {msg.content.trim() && (
+                      <p className="px-3 py-2 whitespace-pre-wrap break-words">{msg.content}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Footer */}
+                {msg.edited_at && (
+                  <span className="text-[9px] text-slate-400 italic px-0.5">(edited)</span>
+                )}
+
+                {/* Reaction bubbles */}
+                {msgReactions.length > 0 && (
+                  <div className={cn('flex flex-wrap gap-1 mt-1', isOwn && 'justify-end')}>
+                    {msgReactions.map((r) => (
+                      <button
+                        key={r.emoji}
+                        onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, r.emoji) }}
+                        className={cn(
+                          'flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs border transition-colors',
+                          r.byMe
+                            ? 'bg-violet-100 dark:bg-violet-900/30 border-violet-400 text-violet-700 dark:text-violet-300'
+                            : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-violet-300',
+                        )}
+                      >
+                        {r.emoji}{r.count > 1 ? ` ${r.count}` : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Hover actions */}
+              <div className={cn(
+                'flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mb-1 shrink-0',
+                isOwn && 'order-first flex-row-reverse',
+              )}>
+                {/* Emoji picker */}
+                <div className="relative">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPickerFor(pickerFor === msg.id ? null : msg.id) }}
+                    className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                  >
+                    <Smile size={14} />
+                  </button>
+                  {pickerFor === msg.id && (
+                    <div className={cn(
+                      'absolute bottom-8 z-20 bg-white dark:bg-slate-800 shadow-lg rounded-xl border border-slate-200 dark:border-slate-700 p-1.5 flex gap-0.5',
+                      isOwn ? 'right-0' : 'left-0',
+                    )}>
+                      {EMOJIS.map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={(e) => { e.stopPropagation(); toggleReaction(msg.id, emoji) }}
+                          className="w-8 h-8 flex items-center justify-center text-base hover:scale-125 transition-transform rounded"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
+                {/* Edit / delete (own only) */}
+                {isOwn && editingId !== msg.id && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); startEdit(msg) }}
+                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteMessage(msg.id) }}
+                      className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )
         })}
+
+        {/* Typing indicator */}
+        {typingUsers.length > 0 && (
+          <div className="flex items-end gap-2 px-2 py-1">
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tl-sm px-3 py-2.5">
+              <p className="text-xs text-slate-400 mb-1">
+                {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing
+              </p>
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
+
+      {/* File preview */}
+      {(mediaPreview || mediaFile) && (
+        <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+          {mediaPreview ? (
+            <div className="relative inline-block">
+              <img src={mediaPreview} alt="" className="h-16 rounded-lg object-cover" />
+              <button
+                onClick={() => { setMediaFile(null); setMediaPreview(null) }}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+              >
+                <X size={10} className="text-white" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Paperclip size={14} className="text-slate-400 shrink-0" />
+              <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{mediaFile!.name}</span>
+              <button onClick={() => setMediaFile(null)} className="ml-auto text-red-400 hover:text-red-500 shrink-0">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Input */}
       <form
         onSubmit={sendMessage}
-        className="flex items-center gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+        className="flex items-center gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
       >
         <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,.pdf,.doc,.docx"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0"
+          title="Attach file"
+        >
+          <Paperclip size={18} />
+        </button>
+        <input
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleInputChange}
           placeholder="Type a message…"
           className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500"
         />
         <button
           type="submit"
-          disabled={!text.trim() || sending}
+          disabled={(!text.trim() && !mediaFile) || sending || uploading}
           className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0"
         >
           <Send size={16} className="text-white" />

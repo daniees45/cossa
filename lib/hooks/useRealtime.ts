@@ -10,7 +10,7 @@ import type { PostWithAuthor } from '@/types/app'
 export function useRealtime() {
   const { user } = useUser()
   const { addNotification } = useNotificationStore()
-  const { incDmUnread } = useChatStore()
+  const { incDmUnread, setChannelUnread } = useChatStore()
   const qc = useQueryClient()
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export function useRealtime() {
           )
         }
       )
-      // ── DM unread: increment when a DM arrives for the current user ──────────
+      // ── DM unread: increment per-sender when a DM arrives ───────────────────
       .on(
         'postgres_changes',
         {
@@ -93,8 +93,21 @@ export function useRealtime() {
           table: 'messages',
           filter: `receiver_id=eq.${user.id}`,
         },
-        () => {
-          incDmUnread()
+        (payload) => {
+          const senderId = (payload.new as { sender_id: string }).sender_id
+          incDmUnread(senderId)
+          qc.invalidateQueries({ queryKey: ['dm-unread'] })
+        }
+      )
+      // ── Channel unread: mark channel dirty on new message ───────────────────
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const msg = payload.new as { channel_id: string | null; sender_id: string }
+          if (msg.channel_id && msg.sender_id !== user.id) {
+            setChannelUnread(msg.channel_id, true)
+          }
         }
       )
       .subscribe()
@@ -102,5 +115,5 @@ export function useRealtime() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, addNotification, incDmUnread, qc])
+  }, [user, addNotification, incDmUnread, setChannelUnread, qc])
 }
