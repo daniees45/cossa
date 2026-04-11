@@ -19,6 +19,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const { user } = useUser()
   const [liked, setLiked] = useState(post.liked_by_me ?? false)
   const [likes, setLikes] = useState(post.likes_count)
+  const [commentsCount, setCommentsCount] = useState(post.comments_count)
   const [showComments, setShowComments] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -123,7 +124,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-violet-600 transition"
           >
             <MessageCircle size={16} />
-            {post.comments_count > 0 && <span>{post.comments_count}</span>}
+            {commentsCount > 0 && <span>{commentsCount}</span>}
           </button>
 
           <button
@@ -137,7 +138,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
       {/* Comments section */}
       {showComments && (
-        <CommentSection postId={post.id} />
+        <CommentSection postId={post.id} onCommentAdded={() => setCommentsCount((c) => c + 1)} />
       )}
 
       {/* Delete confirmation */}
@@ -184,7 +185,7 @@ type CommentRow = {
   replies?: CommentRow[]
 }
 
-function CommentSection({ postId }: { postId: string }) {
+function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentAdded?: () => void }) {
   const { user } = useUser()
   const [comments, setComments] = useState<CommentRow[]>([])
   const [text, setText] = useState('')
@@ -246,6 +247,7 @@ function CommentSection({ postId }: { postId: string }) {
       }
       setText('')
       setReplyingTo(null)
+      onCommentAdded?.()
     }
   }
 

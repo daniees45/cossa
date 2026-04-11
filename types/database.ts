@@ -20,6 +20,7 @@ export interface Database {
           department: string | null
           role: 'student' | 'admin' | 'super_admin'
           index_number: string | null
+          public_key: string | null
           created_at: string
         }
         Insert: {
@@ -32,6 +33,7 @@ export interface Database {
           department?: string | null
           role?: 'student' | 'admin' | 'super_admin'
           index_number?: string | null
+          public_key?: string | null
           created_at?: string
         }
         Update: {
@@ -43,6 +45,7 @@ export interface Database {
           department?: string | null
           role?: 'student' | 'admin' | 'super_admin'
           index_number?: string | null
+          public_key?: string | null
         }
         Relationships: []
       }
@@ -460,6 +463,10 @@ export interface Database {
           p_levels?: string[] | null
         }
         Returns: number
+      }
+      get_login_email: {
+        Args: { p_identifier: string }
+        Returns: string | null
       }
     }
     Enums: Record<string, never>

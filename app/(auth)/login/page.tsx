@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 
 const schema = z.object({
-  email: z.string().email('Enter a valid email'),
+  identifier: z.string().min(3, 'Enter your email or username'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
@@ -27,12 +27,25 @@ export default function LoginPage() {
 
   async function onSubmit(data: FormData) {
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    })
+    const identifier = data.identifier.trim()
+
+    // Resolve username → email if the user didn't enter an email address
+    let email = identifier
+    if (!identifier.includes('@')) {
+      const { data: resolvedEmail, error: rpcError } = await supabase.rpc(
+        'get_login_email',
+        { p_identifier: identifier.toLowerCase() },
+      )
+      if (rpcError || !resolvedEmail) {
+        toast.error('Invalid username or password')
+        return
+      }
+      email = resolvedEmail as string
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password: data.password })
     if (error) {
-      toast.error(error.message)
+      toast.error('Invalid username or password')
       return
     }
     router.push('/')
@@ -46,15 +59,16 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
-          <label className="block text-sm text-slate-300 mb-1.5">Email</label>
+          <label className="block text-sm text-slate-300 mb-1.5">Email or Username</label>
           <input
-            {...register('email')}
-            type="email"
-            placeholder="you@vvu.edu.gh"
+            {...register('identifier')}
+            type="text"
+            placeholder="you@vvu.edu.gh or kwame_dev"
+            autoComplete="username"
             className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 transition text-sm"
           />
-          {errors.email && (
-            <p className="text-red-400 text-xs mt-1">{errors.email.message}</p>
+          {errors.identifier && (
+            <p className="text-red-400 text-xs mt-1">{errors.identifier.message}</p>
           )}
         </div>
 
