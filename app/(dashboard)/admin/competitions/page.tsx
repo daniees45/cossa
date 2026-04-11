@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Plus, Trash2, Loader2, Trophy, Star, CheckCircle, Edit2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, Trophy, Star, CheckCircle, Edit2, Pencil } from 'lucide-react'
 import { formatDate } from '@/lib/utils/formatDate'
 
 type Status = 'upcoming' | 'active' | 'ended'
@@ -31,6 +31,7 @@ export default function AdminCompetitionsPage() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(blankForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   // Scoring state
   const [scoringCompId, setScoringCompId] = useState<string | null>(null)
@@ -92,13 +93,37 @@ export default function AdminCompetitionsPage() {
     },
   })
 
+  function startEdit(comp: typeof competitions[0]) {
+    setEditingId(comp.id)
+    setForm({
+      title: comp.title,
+      description: comp.description ?? '',
+      type: comp.type as CompType,
+      rules: comp.rules ?? '',
+      prizes: comp.prizes ?? '',
+      status: comp.status as Status,
+      starts_at: comp.starts_at ? new Date(comp.starts_at).toISOString().slice(0, 16) : '',
+      ends_at: comp.ends_at ? new Date(comp.ends_at).toISOString().slice(0, 16) : '',
+      max_team_size: comp.max_team_size ?? 4,
+    })
+    setShowForm(true)
+    setScoringCompId(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setForm(blankForm)
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim() || !form.starts_at || !form.ends_at) return
     setSubmitting(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('competitions').insert({
+      const payload = {
         title: form.title.trim(),
         description: form.description.trim() || null,
         type: form.type,
@@ -108,14 +133,20 @@ export default function AdminCompetitionsPage() {
         starts_at: new Date(form.starts_at).toISOString(),
         ends_at: new Date(form.ends_at).toISOString(),
         max_team_size: form.max_team_size,
-      })
-      if (error) throw error
-      toast.success('Competition created!')
-      setForm(blankForm)
-      setShowForm(false)
+      }
+      if (editingId) {
+        const { error } = await supabase.from('competitions').update(payload).eq('id', editingId)
+        if (error) throw error
+        toast.success('Competition updated!')
+      } else {
+        const { error } = await supabase.from('competitions').insert(payload)
+        if (error) throw error
+        toast.success('Competition created!')
+      }
+      cancelForm()
       qc.invalidateQueries({ queryKey: ['admin-competitions'] })
     } catch {
-      toast.error('Failed to create competition')
+      toast.error(editingId ? 'Failed to update competition' : 'Failed to create competition')
     } finally {
       setSubmitting(false)
     }
@@ -131,7 +162,7 @@ export default function AdminCompetitionsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Manage hackathons, quizzes, and coding challenges</p>
         </div>
         <button
-          onClick={() => { setShowForm(!showForm); setScoringCompId(null) }}
+          onClick={() => { cancelForm(); setShowForm(!showForm); setScoringCompId(null) }}
           className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
         >
           <Plus size={16} />
@@ -142,7 +173,7 @@ export default function AdminCompetitionsPage() {
       {/* Create Form */}
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 dark:text-white">Create Competition</h2>
+          <h2 className="font-semibold text-slate-900 dark:text-white">{editingId ? 'Edit Competition' : 'Create Competition'}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
@@ -257,11 +288,11 @@ export default function AdminCompetitionsPage() {
               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-xl transition-colors"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
-              Create Competition
+              {editingId ? 'Save Changes' : 'Create Competition'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={cancelForm}
               className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-4 py-2"
             >
               Cancel
@@ -359,6 +390,13 @@ export default function AdminCompetitionsPage() {
                     className="flex items-center gap-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-100 px-3 py-1.5 rounded-lg transition-colors"
                   >
                     <Edit2 size={12} /> Score
+                  </button>
+                  <button
+                    onClick={() => startEdit(comp)}
+                    title="Edit"
+                    className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                  >
+                    <Pencil size={15} />
                   </button>
                   <button
                     onClick={() => {

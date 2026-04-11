@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { uploadFile } from '@/lib/utils/uploadFile'
 import { toast } from 'sonner'
-import { Plus, Trash2, Loader2, Calendar, MapPin, Image as ImageIcon } from 'lucide-react'
+import { Plus, Trash2, Loader2, Calendar, MapPin, Image as ImageIcon, Pencil } from 'lucide-react'
 import { formatDate } from '@/lib/utils/formatDate'
 
 type EventType = 'social_event' | 'competition' | 'seminar' | 'fun'
@@ -31,6 +31,7 @@ export default function AdminEventsPage() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(blankForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -64,36 +65,77 @@ export default function AdminEventsPage() {
     setCoverPreview(URL.createObjectURL(file))
   }
 
+  function startEdit(ev: typeof events[0]) {
+    setEditingId(ev.id)
+    setForm({
+      title: ev.title,
+      description: ev.description ?? '',
+      type: ev.type as EventType,
+      location: ev.location ?? '',
+      event_date: ev.event_date ? new Date(ev.event_date).toISOString().slice(0, 16) : '',
+      coverFile: null,
+    })
+    setCoverPreview(ev.cover_url ?? null)
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setForm(blankForm)
+    setCoverPreview(null)
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim() || !form.event_date) return
     setSubmitting(true)
     try {
       const supabase = createClient()
-      let cover_url: string | null = null
+      let cover_url: string | undefined = undefined
       if (form.coverFile) {
         const path = `events/${Date.now()}-${form.coverFile.name}`
         cover_url = await uploadFile(form.coverFile, 'covers', path)
       }
 
-      const { error } = await supabase.from('events').insert({
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        type: form.type,
-        location: form.location.trim() || null,
-        event_date: new Date(form.event_date).toISOString(),
-        cover_url,
-        created_by: user!.id,
-      })
-      if (error) throw error
+      if (editingId) {
+        const updatePayload: {
+          title: string
+          description: string | null
+          type: EventType
+          location: string | null
+          event_date: string
+          cover_url?: string | null
+        } = {
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          type: form.type,
+          location: form.location.trim() || null,
+          event_date: new Date(form.event_date).toISOString(),
+        }
+        if (cover_url !== undefined) updatePayload.cover_url = cover_url
+        const { error } = await supabase.from('events').update(updatePayload).eq('id', editingId)
+        if (error) throw error
+        toast.success('Event updated!')
+      } else {
+        const { error } = await supabase.from('events').insert({
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          type: form.type,
+          location: form.location.trim() || null,
+          event_date: new Date(form.event_date).toISOString(),
+          cover_url: cover_url ?? null,
+          created_by: user!.id,
+        })
+        if (error) throw error
+        toast.success('Event created!')
+      }
 
-      toast.success('Event created!')
-      setForm(blankForm)
-      setCoverPreview(null)
-      setShowForm(false)
+      cancelForm()
       qc.invalidateQueries({ queryKey: ['admin-events'] })
     } catch {
-      toast.error('Failed to create event')
+      toast.error(editingId ? 'Failed to update event' : 'Failed to create event')
     } finally {
       setSubmitting(false)
     }
@@ -107,7 +149,7 @@ export default function AdminEventsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Manage COSSA events and gatherings</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { cancelForm(); setShowForm(!showForm) }}
           className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
         >
           <Plus size={16} />
@@ -118,7 +160,7 @@ export default function AdminEventsPage() {
       {/* Create Form */}
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 dark:text-white">Create Event</h2>
+          <h2 className="font-semibold text-slate-900 dark:text-white">{editingId ? 'Edit Event' : 'Create Event'}</h2>
 
           {/* Cover image */}
           <div>
@@ -203,11 +245,11 @@ export default function AdminEventsPage() {
               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-xl transition-colors"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
-              Create Event
+              {editingId ? 'Save Changes' : 'Create Event'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={cancelForm}
               className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-4 py-2"
             >
               Cancel
@@ -262,6 +304,13 @@ export default function AdminEventsPage() {
                       <span>{ev.rsvp_count} RSVP{ev.rsvp_count !== 1 ? 's' : ''}</span>
                     </div>
                   </div>
+                  <button
+                    onClick={() => startEdit(ev)}
+                    title="Edit"
+                    className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors shrink-0"
+                  >
+                    <Pencil size={16} />
+                  </button>
                   <button
                     onClick={() => {
                       if (confirm('Delete this event?')) deleteEvent(ev.id)

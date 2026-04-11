@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { uploadFile } from '@/lib/utils/uploadFile'
 import { useUser } from '@/lib/hooks/useUser'
 import { toast } from 'sonner'
-import { Plus, Trash2, Loader2, FileText, Download } from 'lucide-react'
+import { Plus, Trash2, Loader2, FileText, Download, Pencil } from 'lucide-react'
 import { timeAgo } from '@/lib/utils/formatDate'
 import type { Resource } from '@/types/app'
 
@@ -33,6 +33,7 @@ export default function AdminResourcesPage() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(blankForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -62,6 +63,26 @@ export default function AdminResourcesPage() {
     onError: () => toast.error('Failed to delete'),
   })
 
+  function startEdit(r: Resource) {
+    setEditingId(r.id)
+    setForm({
+      title: r.title,
+      description: r.description ?? '',
+      course_code: r.course_code ?? '',
+      level: r.level ?? '',
+    })
+    setFile(null)
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setForm(blankForm)
+    setFile(null)
+  }
+
   function onFilePick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = e.target.files?.[0]
     if (picked) setFile(picked)
@@ -69,30 +90,41 @@ export default function AdminResourcesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.title.trim() || !file || !user) return
+    if (!form.title.trim()) return
+    if (!editingId && (!file || !user)) return
     setSubmitting(true)
     try {
       const supabase = createClient()
-      const path = `${user.id}/${Date.now()}-${file.name.replace(/\s+/g, '_')}`
-      const fileUrl = await uploadFile(file, 'resources', path)
-
-      const { error } = await supabase.from('resources').insert({
-        title: form.title.trim(),
-        description: form.description.trim() || null,
-        course_code: form.course_code.trim().toUpperCase() || null,
-        level: form.level || null,
-        file_url: fileUrl,
-        uploaded_by: user.id,
-      })
-      if (error) throw error
-
-      toast.success('Resource uploaded!')
+      if (editingId) {
+        const { error } = await supabase
+          .from('resources')
+          .update({
+            title: form.title.trim(),
+            description: form.description.trim() || null,
+            course_code: form.course_code.trim().toUpperCase() || null,
+            level: form.level || null,
+          })
+          .eq('id', editingId)
+        if (error) throw error
+        toast.success('Resource updated!')
+      } else {
+        const path = `${user!.id}/${Date.now()}-${file!.name.replace(/\s+/g, '_')}`
+        const fileUrl = await uploadFile(file!, 'resources', path)
+        const { error } = await supabase.from('resources').insert({
+          title: form.title.trim(),
+          description: form.description.trim() || null,
+          course_code: form.course_code.trim().toUpperCase() || null,
+          level: form.level || null,
+          file_url: fileUrl,
+          uploaded_by: user!.id,
+        })
+        if (error) throw error
+        toast.success('Resource uploaded!')
+      }
       qc.invalidateQueries({ queryKey: ['admin-resources'] })
-      setForm(blankForm)
-      setFile(null)
-      setShowForm(false)
+      cancelForm()
     } catch {
-      toast.error('Upload failed')
+      toast.error(editingId ? 'Update failed' : 'Upload failed')
     } finally {
       setSubmitting(false)
     }
@@ -106,7 +138,7 @@ export default function AdminResourcesPage() {
           <p className="text-slate-500 text-sm mt-0.5">Upload academic files visible to all students</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { cancelForm(); setShowForm(!showForm) }}
           className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition"
         >
           <Plus size={15} />
@@ -120,7 +152,7 @@ export default function AdminResourcesPage() {
           onSubmit={handleSubmit}
           className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4"
         >
-          <h2 className="font-semibold text-slate-900 dark:text-white">New Resource</h2>
+          <h2 className="font-semibold text-slate-900 dark:text-white">{editingId ? 'Edit Resource' : 'New Resource'}</h2>
 
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Title *</label>
@@ -169,7 +201,8 @@ export default function AdminResourcesPage() {
             </div>
           </div>
 
-          {/* File picker */}
+          {/* File picker — only for new uploads */}
+          {!editingId && (
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">File *</label>
             <div
@@ -196,19 +229,20 @@ export default function AdminResourcesPage() {
               onChange={onFilePick}
             />
           </div>
+          )}
 
           <div className="flex gap-3 pt-1">
             <button
               type="submit"
-              disabled={submitting || !file}
+              disabled={submitting || (!editingId && !file)}
               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-xl transition"
             >
               {submitting && <Loader2 size={13} className="animate-spin" />}
-              Upload Resource
+              {editingId ? 'Save Changes' : 'Upload Resource'}
             </button>
             <button
               type="button"
-              onClick={() => { setShowForm(false); setForm(blankForm); setFile(null) }}
+              onClick={cancelForm}
               className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-3 py-2"
             >
               Cancel
@@ -253,6 +287,13 @@ export default function AdminResourcesPage() {
               >
                 View
               </a>
+              <button
+                onClick={() => startEdit(r)}
+                title="Edit"
+                className="text-slate-400 hover:text-violet-600 transition shrink-0"
+              >
+                <Pencil size={15} />
+              </button>
               <button
                 onClick={() => deleteResource(r.id)}
                 className="text-slate-400 hover:text-red-500 transition shrink-0"

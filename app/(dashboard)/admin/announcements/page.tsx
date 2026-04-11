@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { toast } from 'sonner'
-import { Plus, Trash2, Pin, PinOff, Loader2, Megaphone } from 'lucide-react'
+import { Plus, Trash2, Pin, PinOff, Loader2, Megaphone, Pencil } from 'lucide-react'
 import { formatDate } from '@/lib/utils/formatDate'
 
 type Category = 'news' | 'academic' | 'urgent'
@@ -20,6 +20,7 @@ export default function AdminAnnouncementsPage() {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ title: '', body: '', category: 'news' as Category, pinned: false })
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const { data: announcements = [], isLoading } = useQuery({
@@ -54,26 +55,49 @@ export default function AdminAnnouncementsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-announcements'] }),
   })
 
+  function startEdit(ann: typeof announcements[0]) {
+    setEditingId(ann.id)
+    setForm({ title: ann.title, body: ann.body, category: ann.category as Category, pinned: ann.pinned })
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setForm({ title: '', body: '', category: 'news', pinned: false })
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim() || !form.body.trim()) return
     setSubmitting(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from('announcements').insert({
-        title: form.title.trim(),
-        body: form.body.trim(),
-        category: form.category,
-        pinned: form.pinned,
-        author_id: user!.id,
-      })
-      if (error) throw error
-      toast.success('Announcement created!')
-      setForm({ title: '', body: '', category: 'news', pinned: false })
-      setShowForm(false)
+      if (editingId) {
+        const { error } = await supabase.from('announcements').update({
+          title: form.title.trim(),
+          body: form.body.trim(),
+          category: form.category,
+          pinned: form.pinned,
+        }).eq('id', editingId)
+        if (error) throw error
+        toast.success('Announcement updated!')
+      } else {
+        const { error } = await supabase.from('announcements').insert({
+          title: form.title.trim(),
+          body: form.body.trim(),
+          category: form.category,
+          pinned: form.pinned,
+          author_id: user!.id,
+        })
+        if (error) throw error
+        toast.success('Announcement created!')
+      }
+      cancelForm()
       qc.invalidateQueries({ queryKey: ['admin-announcements'] })
     } catch {
-      toast.error('Failed to create announcement')
+      toast.error(editingId ? 'Failed to update' : 'Failed to create announcement')
     } finally {
       setSubmitting(false)
     }
@@ -87,7 +111,7 @@ export default function AdminAnnouncementsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Publish news, academic updates, and urgent notices</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { cancelForm(); setShowForm(!showForm) }}
           className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
         >
           <Plus size={16} />
@@ -98,7 +122,7 @@ export default function AdminAnnouncementsPage() {
       {/* Create Form */}
       {showForm && (
         <form onSubmit={handleCreate} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 space-y-4">
-          <h2 className="font-semibold text-slate-900 dark:text-white">Create Announcement</h2>
+          <h2 className="font-semibold text-slate-900 dark:text-white">{editingId ? 'Edit Announcement' : 'Create Announcement'}</h2>
 
           <div>
             <label className="block text-sm text-slate-600 dark:text-slate-400 mb-1">Title *</label>
@@ -157,11 +181,11 @@ export default function AdminAnnouncementsPage() {
               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-xl transition-colors"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
-              Publish
+              {editingId ? 'Save Changes' : 'Publish'}
             </button>
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={cancelForm}
               className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-4 py-2"
             >
               Cancel
@@ -206,6 +230,13 @@ export default function AdminAnnouncementsPage() {
                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{ann.body}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => startEdit(ann)}
+                      title="Edit"
+                      className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                    >
+                      <Pencil size={15} />
+                    </button>
                     <button
                       onClick={() => togglePin({ id: ann.id, pinned: !ann.pinned })}
                       title={ann.pinned ? 'Unpin' : 'Pin'}

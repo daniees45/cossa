@@ -366,6 +366,7 @@ export interface Database {
         Update: {
           title?: string
           description?: string | null
+          type?: 'hackathon' | 'quiz' | 'coding_challenge'
           rules?: string | null
           prizes?: string | null
           status?: 'upcoming' | 'active' | 'ended'
