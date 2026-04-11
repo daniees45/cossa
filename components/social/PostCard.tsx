@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Pin } from 'lucide-react'
+import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/shared/Avatar'
@@ -20,6 +20,8 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const [liked, setLiked] = useState(post.liked_by_me ?? false)
   const [likes, setLikes] = useState(post.likes_count)
   const [showComments, setShowComments] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function toggleLike() {
     if (!user) return
@@ -36,9 +38,10 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   }
 
   async function deletePost() {
+    setDeleting(true)
     const supabase = createClient()
     const { error } = await supabase.from('posts').delete().eq('id', post.id)
-    if (error) toast.error('Failed to delete post')
+    if (error) { toast.error('Failed to delete post'); setDeleting(false) }
     else onDeleted?.(post.id)
   }
 
@@ -74,10 +77,10 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
               </button>
               <div className="absolute right-0 top-8 hidden group-focus-within:block bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg py-1 z-10 min-w-32">
                 <button
-                  onClick={deletePost}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
                 >
-                  Delete
+                  <Trash2 size={13} /> Delete
                 </button>
               </div>
             </div>
@@ -136,33 +139,85 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
       {showComments && (
         <CommentSection postId={post.id} />
       )}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDelete(false)} />
+          <div className="relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm shadow-2xl">
+            <button onClick={() => setConfirmDelete(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+              <X size={16} />
+            </button>
+            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+              <Trash2 size={18} className="text-red-600" />
+            </div>
+            <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Delete post?</h3>
+            <p className="text-sm text-slate-500 mb-5">This can&apos;t be undone. The post and all its comments will be permanently removed.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={deletePost}
+                disabled={deleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-xl transition"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   )
 }
 
+type CommentRow = {
+  id: string
+  content: string
+  created_at: string
+  parent_id: string | null
+  author: { username: string; full_name: string; avatar_url: string | null }
+  replies?: CommentRow[]
+}
+
 function CommentSection({ postId }: { postId: string }) {
   const { user } = useUser()
-  const [comments, setComments] = useState<Array<{
-    id: string; content: string; created_at: string;
-    author: { username: string; full_name: string; avatar_url: string | null }
-  }>>([])
+  const [comments, setComments] = useState<CommentRow[]>([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null)
 
   useState(() => {
     const supabase = createClient()
     supabase
       .from('post_comments')
-      .select('id, content, created_at, author:profiles!author_id(username, full_name, avatar_url)')
+      .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
       .eq('post_id', postId)
-      .is('parent_id', null)
       .order('created_at', { ascending: true })
-      .limit(10)
+      .limit(50)
       .then(({ data }) => {
-        if (data) setComments(data as never)
+        if (data) setComments(buildTree(data as CommentRow[]))
         setLoading(false)
       })
   })
+
+  function buildTree(flat: CommentRow[]): CommentRow[] {
+    const map = new Map<string, CommentRow>()
+    const roots: CommentRow[] = []
+    flat.forEach((c) => { map.set(c.id, { ...c, replies: [] }) })
+    map.forEach((c) => {
+      if (c.parent_id && map.has(c.parent_id)) {
+        map.get(c.parent_id)!.replies!.push(c)
+      } else {
+        roots.push(c)
+      }
+    })
+    return roots
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -170,12 +225,27 @@ function CommentSection({ postId }: { postId: string }) {
     const supabase = createClient()
     const { data, error } = await supabase
       .from('post_comments')
-      .insert({ post_id: postId, author_id: user.id, content: text.trim() })
-      .select('id, content, created_at, author:profiles!author_id(username, full_name, avatar_url)')
+      .insert({
+        post_id: postId,
+        author_id: user.id,
+        content: text.trim(),
+        parent_id: replyingTo?.id ?? null,
+      })
+      .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
       .single()
     if (!error && data) {
-      setComments((c) => [...c, data as never])
+      const newComment = { ...(data as CommentRow), replies: [] }
+      if (replyingTo) {
+        setComments((prev) => prev.map((c) =>
+          c.id === replyingTo.id
+            ? { ...c, replies: [...(c.replies ?? []), newComment] }
+            : c
+        ))
+      } else {
+        setComments((c) => [...c, newComment])
+      }
       setText('')
+      setReplyingTo(null)
     }
   }
 
@@ -185,34 +255,75 @@ function CommentSection({ postId }: { postId: string }) {
         <p className="text-xs text-slate-400">Loading comments…</p>
       ) : (
         comments.map((c) => (
-          <div key={c.id} className="flex gap-2.5">
-            <Avatar src={c.author.avatar_url} name={c.author.full_name} size="sm" />
-            <div className="flex-1 bg-slate-50 dark:bg-slate-700 rounded-xl px-3 py-2">
-              <p className="text-xs font-semibold text-slate-800 dark:text-white">{c.author.full_name}</p>
-              <p className="text-xs text-slate-700 dark:text-slate-200 mt-0.5">{c.content}</p>
-            </div>
-          </div>
+          <CommentItem key={c.id} comment={c} onReply={(id, name) => { setReplyingTo({ id, name }); setText('') }} />
         ))
       )}
 
       {user && (
-        <form onSubmit={submit} className="flex gap-2 mt-2">
-          <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Write a comment…"
-            className="flex-1 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500"
-          />
-          <button
-            type="submit"
-            disabled={!text.trim()}
-            className="px-3 py-2 rounded-xl bg-violet-600 text-white text-xs font-medium disabled:opacity-40"
-          >
-            Post
-          </button>
+        <form onSubmit={submit} className="flex flex-col gap-2 mt-2">
+          {replyingTo && (
+            <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg">
+              <Reply size={12} className="text-violet-500" />
+              <span>Replying to <strong className="text-slate-700 dark:text-slate-300">@{replyingTo.name}</strong></span>
+              <button type="button" onClick={() => setReplyingTo(null)} className="ml-auto text-slate-400 hover:text-slate-600">
+                <X size={12} />
+              </button>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={replyingTo ? `Reply to ${replyingTo.name}…` : 'Write a comment…'}
+              className="flex-1 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500"
+            />
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              className="px-3 py-2 rounded-xl bg-violet-600 text-white text-xs font-medium disabled:opacity-40"
+            >
+              Post
+            </button>
+          </div>
         </form>
       )}
+    </div>
+  )
+}
+
+function CommentItem({ comment, onReply, depth = 0 }: {
+  comment: CommentRow
+  onReply: (id: string, username: string) => void
+  depth?: number
+}) {
+  return (
+    <div className={cn('flex gap-2.5', depth > 0 && 'ml-8 mt-2')}>
+      <Avatar src={comment.author.avatar_url} name={comment.author.full_name} size="sm" />
+      <div className="flex-1 min-w-0">
+        <div className="bg-slate-50 dark:bg-slate-700 rounded-xl px-3 py-2">
+          <p className="text-xs font-semibold text-slate-800 dark:text-white">{comment.author.full_name}</p>
+          <p className="text-xs text-slate-700 dark:text-slate-200 mt-0.5">{comment.content}</p>
+        </div>
+        <div className="flex items-center gap-3 mt-1 ml-1">
+          <span className="text-[10px] text-slate-400">{timeAgo(comment.created_at)}</span>
+          {depth === 0 && (
+            <button
+              onClick={() => onReply(comment.id, comment.author.username)}
+              className="text-[10px] text-slate-400 hover:text-violet-600 flex items-center gap-1 transition"
+            >
+              <Reply size={11} /> Reply
+            </button>
+          )}
+        </div>
+        {comment.replies && comment.replies.length > 0 && (
+          <div className="space-y-2 mt-1">
+            {comment.replies.map((r) => (
+              <CommentItem key={r.id} comment={r} onReply={onReply} depth={depth + 1} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

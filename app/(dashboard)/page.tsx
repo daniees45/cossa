@@ -4,6 +4,7 @@ import { PostCard } from '@/components/social/PostCard'
 import { PostEditor } from '@/components/social/PostEditor'
 import { FeedSkeleton } from '@/components/social/FeedSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { SuggestedUsers } from '@/components/social/SuggestedUsers'
 import { LayoutGrid, Loader2 } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import type { PostWithAuthor } from '@/types/app'
@@ -42,39 +43,49 @@ export default function FeedPage() {
   }, [handleIntersect])
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6 space-y-4">
-      {/* Post editor */}
-      {user && (
-        <PostEditor
-          onPosted={(post) => setLocalPosts((prev) => [post, ...prev])}
-        />
-      )}
-
-      {/* Feed */}
-      {isLoading ? (
-        <FeedSkeleton />
-      ) : feed.length === 0 ? (
-        <EmptyState
-          icon={<LayoutGrid size={24} />}
-          title="Nothing here yet"
-          description="Be the first to post something for the COSSA community!"
-        />
-      ) : (
-        <>
-          {feed.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              onDeleted={(id) => setLocalPosts((prev) => prev.filter((p) => p.id !== id))}
+    <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="flex gap-6 items-start">
+        {/* Main feed column */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* Post editor */}
+          {user && (
+            <PostEditor
+              onPosted={(post) => setLocalPosts((prev) => [post, ...prev])}
             />
-          ))}
+          )}
 
-          {/* Infinite scroll sentinel */}
-          <div ref={loaderRef} className="flex justify-center py-4">
-            {isFetchingNextPage && <Loader2 size={20} className="animate-spin text-violet-600" />}
-          </div>
-        </>
-      )}
+          {/* Feed */}
+          {isLoading ? (
+            <FeedSkeleton />
+          ) : feed.length === 0 ? (
+            <EmptyState
+              icon={<LayoutGrid size={24} />}
+              title="Nothing here yet"
+              description="Be the first to post something for the COSSA community!"
+            />
+          ) : (
+            <>
+              {feed.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onDeleted={(id) => setLocalPosts((prev) => prev.filter((p) => p.id !== id))}
+                />
+              ))}
+
+              {/* Infinite scroll sentinel */}
+              <div ref={loaderRef} className="flex justify-center py-4">
+                {isFetchingNextPage && <Loader2 size={20} className="animate-spin text-violet-600" />}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right sidebar - suggested users (hidden on mobile) */}
+        <aside className="hidden lg:block w-72 shrink-0 sticky top-6">
+          <SuggestedUsers />
+        </aside>
+      </div>
     </div>
   )
 }
