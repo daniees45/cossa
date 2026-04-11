@@ -6,7 +6,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import {
   Send, ArrowLeft, Lock, LockOpen, Paperclip, Smile,
-  Pencil, Trash2, CheckCheck, X, Copy, ChevronDown, MessageCircle,
+  Pencil, Trash2, CheckCheck, X, Copy, ChevronDown, MessageCircle, Settings, Bell, BellOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { timeAgo } from '@/lib/utils/formatDate'
@@ -45,6 +45,12 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const { user } = useUser()
   const qc = useQueryClient()
   const { clearDmUnread } = useChatStore()
+
+  const [showSettings, setShowSettings] = useState(false)
+  const [mutedDms, setMutedDms] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem('mutedDms') ?? '[]') } catch { return [] }
+  })
 
   // ── Core state ───────────────────────────────────────────────────────────
   const [messages, setMessages] = useState<MessageWithSender[]>([])
@@ -484,6 +490,36 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     setPickerFor(null)
   }
 
+  function toggleMuteDm() {
+    setMutedDms((prev) => {
+      const next = prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+      localStorage.setItem('mutedDms', JSON.stringify(next))
+      return next
+    })
+  }
+
+  function clearConversation() {
+    if (!confirm('Hide all your sent messages from this conversation?')) return
+    const supabase = createClient()
+    // Soft-delete all own messages in this DM (show update to others isn't affected)
+    supabase
+      .from('messages')
+      .update({ deleted_for_sender: true })
+      .eq('sender_id', user!.id)
+      .not('channel_id', 'is', null)
+      .then(() => {
+        // Also target DM messages (no channel_id)
+        supabase
+          .from('messages')
+          .update({ deleted_for_sender: true })
+          .eq('sender_id', user!.id)
+          .is('channel_id', null)
+          .then(() => {
+            setMessages((prev) => prev.filter((m) => m.sender_id !== user?.id))
+          })
+      })
+  }
+
   const visibleMap = new Map(visible.map((v) => [v.id, v]))
 
   // "Seen" indicator: last sent message that has been read
@@ -493,6 +529,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     }
     return null
   })()
+
+  const isMutedDm = mutedDms.includes(userId)
 
   return (
     <div className="flex flex-col h-full" onClick={() => setPickerFor(null)}>
@@ -523,9 +561,97 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               {e2eActive ? <Lock size={11} /> : <LockOpen size={11} />}
               <span className="hidden sm:inline">{e2eActive ? 'Encrypted' : 'Not encrypted'}</span>
             </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowSettings(true) }}
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
+              title="Conversation settings"
+            >
+              <Settings size={16} />
+            </button>
           </>
         )}
       </div>
+
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="fixed inset-0 z-40 flex" onClick={() => setShowSettings(false)}>
+          <div className="flex-1" />
+          <div
+            className="w-80 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+              <p className="font-semibold text-slate-900 dark:text-white text-sm">Conversation info</p>
+              <button onClick={() => setShowSettings(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* User info */}
+            <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-col items-center text-center">
+              <Avatar src={other?.avatar_url ?? null} name={other?.full_name ?? ''} size="lg" className="mb-2" />
+              <p className="font-semibold text-slate-900 dark:text-white">{other?.full_name}</p>
+              <p className="text-xs text-slate-400">@{other?.username}</p>
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className={cn('w-2 h-2 rounded-full shrink-0', otherOnline ? 'bg-emerald-500' : 'bg-slate-300')} />
+                <span className="text-xs text-slate-400">{otherOnline ? 'Online now' : 'Offline'}</span>
+              </div>
+            </div>
+
+            {/* Encryption */}
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Encryption</p>
+              <div className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-xl text-sm',
+                e2eActive ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 text-slate-500',
+              )}>
+                {e2eActive ? <Lock size={14} /> : <LockOpen size={14} />}
+                {e2eActive ? 'End-to-end encrypted' : 'Not encrypted'}
+              </div>
+            </div>
+
+            {/* Shared media */}
+            {(() => {
+              const mediaMessages = messages.filter((m) => m.media_url && /\.(jpg|jpeg|png|gif|webp)$/i.test(m.media_url))
+              return mediaMessages.length > 0 ? (
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Shared media ({mediaMessages.length})</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {mediaMessages.slice(-9).map((m) => (
+                      <img
+                        key={m.id}
+                        src={m.media_url!}
+                        alt=""
+                        className="w-full aspect-square object-cover rounded-lg cursor-pointer hover:opacity-80 transition"
+                        onClick={() => window.open(m.media_url!)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null
+            })()}
+
+            {/* Actions */}
+            <div className="px-4 py-3 space-y-1">
+              <button
+                onClick={toggleMuteDm}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition"
+              >
+                {isMutedDm ? <Bell size={15} className="text-violet-500" /> : <BellOff size={15} className="text-slate-400" />}
+                {isMutedDm ? 'Unmute notifications' : 'Mute notifications'}
+              </button>
+              <button
+                onClick={() => { setShowSettings(false); clearConversation() }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition"
+              >
+                <Trash2 size={15} />
+                Clear conversation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-1">

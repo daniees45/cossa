@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import {
-  Send, ArrowLeft, Paperclip, Smile, Pencil, Trash2, X, Copy, ChevronDown, MessageCircle, Users,
+  Send, ArrowLeft, Paperclip, Smile, Pencil, Trash2, X, Copy, ChevronDown, MessageCircle, Users, Settings, Bell, BellOff, LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { timeAgo } from '@/lib/utils/formatDate'
@@ -27,6 +27,9 @@ function formatDay(iso: string) {
   if (sameDay(iso, today.toISOString())) return 'Today'
   if (sameDay(iso, yesterday.toISOString())) return 'Yesterday'
   return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
+}
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
 export default function ChannelPage({ params }: { params: Promise<{ channelId: string }> }) {
@@ -54,6 +57,13 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const [pickerFor, setPickerFor] = useState<string | null>(null)
 
   // Typing indicator
+  const [showSettings, setShowSettings] = useState(false)
+  const [members, setMembers] = useState<{ id: string; full_name: string; avatar_url: string | null; username: string }[]>([])
+  const [mutedChannels, setMutedChannels] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return []
+    try { return JSON.parse(localStorage.getItem('mutedChannels') ?? '[]') } catch { return [] }
+  })
+
   const [typingUsers, setTypingUsers] = useState<string[]>([])
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const lastTypeBroadcastRef = useRef(0)
@@ -351,6 +361,38 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     await supabase.from('messages').delete().eq('id', id)
   }
 
+  async function loadMembers() {
+    const supabase = createClient()
+    const { data: memberRows } = await supabase
+      .from('channel_members')
+      .select('user_id')
+      .eq('channel_id', channelId)
+      .limit(50)
+    if (!memberRows?.length) return
+    const ids = memberRows.map((r) => r.user_id)
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, username')
+      .in('id', ids)
+    if (profiles) setMembers(profiles as { id: string; full_name: string; avatar_url: string | null; username: string }[])
+  }
+
+  async function leaveChannel() {
+    if (!user) return
+    if (!confirm('Leave this channel?')) return
+    const supabase = createClient()
+    await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('user_id', user.id)
+    window.location.href = '/chat'
+  }
+
+  function toggleMute() {
+    setMutedChannels((prev) => {
+      const next = prev.includes(channelId) ? prev.filter((id) => id !== channelId) : [...prev, channelId]
+      localStorage.setItem('mutedChannels', JSON.stringify(next))
+      return next
+    })
+  }
+
   async function toggleReaction(messageId: string, emoji: string) {
     if (!user) return
     const supabase = createClient()
@@ -364,6 +406,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     setPickerFor(null)
   }
 
+  const isMuted = mutedChannels.includes(channelId)
+
   return (
     <div className="flex flex-col h-full" onClick={() => setPickerFor(null)}>
       {/* Header */}
@@ -374,7 +418,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
           <span className="text-violet-600 font-bold text-xs">#</span>
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-900 dark:text-white text-sm">{channel?.name}</p>
           <div className="flex items-center gap-2 text-xs text-slate-400">
             {channel?.description && <span className="truncate">{channel.description}</span>}
@@ -383,7 +427,87 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
             )}
           </div>
         </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowSettings(true); loadMembers() }}
+          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 shrink-0"
+          title="Channel settings"
+        >
+          <Settings size={16} />
+        </button>
       </div>
+
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="fixed inset-0 z-40 flex" onClick={() => setShowSettings(false)}>
+          <div className="flex-1" />
+          <div
+            className="w-80 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+              <p className="font-semibold text-slate-900 dark:text-white text-sm">Channel settings</p>
+              <button onClick={() => setShowSettings(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Channel info */}
+            <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mb-3">
+                <span className="text-violet-600 font-bold text-lg">#</span>
+              </div>
+              <p className="font-semibold text-slate-900 dark:text-white">{channel?.name}</p>
+              {channel?.description && (
+                <p className="text-xs text-slate-400 mt-1">{channel.description}</p>
+              )}
+              <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                <Users size={11} /> {memberCount} {memberCount === 1 ? 'member' : 'members'}
+              </p>
+            </div>
+
+            {/* Members list */}
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Members</p>
+              {members.length === 0 ? (
+                <p className="text-xs text-slate-400">Loading…</p>
+              ) : (
+                <div className="space-y-2">
+                  {members.map((m) => (
+                    <div key={m.id} className="flex items-center gap-2">
+                      <Avatar src={m.avatar_url} name={m.full_name} size="sm" />
+                      <div className="min-w-0">
+                        <p className="text-sm text-slate-800 dark:text-slate-200 truncate">
+                          {m.full_name}{m.id === user?.id ? ' (you)' : ''}
+                        </p>
+                        <p className="text-[11px] text-slate-400 truncate">@{m.username}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="px-4 py-3 space-y-1">
+              <button
+                onClick={toggleMute}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition"
+              >
+                {isMuted ? <Bell size={15} className="text-violet-500" /> : <BellOff size={15} className="text-slate-400" />}
+                {isMuted ? 'Unmute notifications' : 'Mute notifications'}
+              </button>
+              <button
+                onClick={leaveChannel}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 transition"
+              >
+                <LogOut size={15} />
+                Leave channel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
@@ -409,7 +533,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           </div>
         )}
 
-        {messages.map((msg, i) => {
+        {messages
+          .filter((m) => !(m.deleted_for_sender && m.sender_id === user?.id))
+          .map((msg, i) => {
           const isOwn = msg.sender_id === user?.id
           const prevMsg = messages[i - 1]
           const showDateSep = !prevMsg || !sameDay(prevMsg.created_at, msg.created_at)
@@ -441,7 +567,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
               <div className={cn('max-w-[70%]', isOwn && 'items-end flex flex-col')}>
                 {!grouped && (
                   <p className="text-xs text-slate-400 mb-1 px-1">
-                    {isOwn ? 'You' : msg.sender.full_name} · {timeAgo(msg.created_at)}
+                    {isOwn ? 'You' : msg.sender.full_name}
                   </p>
                 )}
 
@@ -486,14 +612,20 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                       </div>
                     )}
                     {msg.content.trim() && (
-                      <p className="px-3 py-2 whitespace-pre-wrap break-words">{msg.content}</p>
+                      <p className="px-3 pt-2 pb-1 whitespace-pre-wrap break-words">{msg.content}</p>
                     )}
+                    {/* Time row inside bubble */}
+                    <div className={cn(
+                      'flex items-center gap-1 px-2.5 pb-1.5 pt-0',
+                      isOwn ? 'justify-end' : 'justify-start',
+                    )}>
+                      {msg.edited_at && <span className="text-[9px] italic opacity-70">(edited)</span>}
+                      <span className={cn(
+                        'text-[10px] opacity-70 leading-none',
+                        isOwn ? 'text-violet-200' : 'text-slate-400',
+                      )}>{formatTime(msg.created_at)}</span>
+                    </div>
                   </div>
-                )}
-
-                {/* Footer */}
-                {msg.edited_at && (
-                  <span className="text-[9px] text-slate-400 italic px-0.5">(edited)</span>
                 )}
 
                 {/* Reaction bubbles */}
