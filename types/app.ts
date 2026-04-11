@@ -18,6 +18,7 @@ export type Notification = Database['public']['Tables']['notifications']['Row']
 export type PostWithAuthor = Post & {
   author: Profile
   liked_by_me?: boolean
+  bookmarked_by_me?: boolean
 }
 
 export type CommentWithAuthor = PostComment & {

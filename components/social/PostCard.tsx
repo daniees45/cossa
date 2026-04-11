@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply } from 'lucide-react'
+import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/shared/Avatar'
@@ -19,6 +19,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const { user } = useUser()
   const [liked, setLiked] = useState(post.liked_by_me ?? false)
   const [likes, setLikes] = useState(post.likes_count)
+  const [bookmarked, setBookmarked] = useState(post.bookmarked_by_me ?? false)
   const [commentsCount, setCommentsCount] = useState(post.comments_count)
   const [showComments, setShowComments] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -35,6 +36,20 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
       await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id })
     } else {
       await supabase.from('post_likes').delete().match({ post_id: post.id, user_id: user.id })
+    }
+  }
+
+  async function toggleBookmark() {
+    if (!user) return
+    const supabase = createClient()
+    const next = !bookmarked
+    setBookmarked(next)
+    if (next) {
+      await supabase.from('post_bookmarks').insert({ post_id: post.id, user_id: user.id })
+      toast.success('Saved to bookmarks')
+    } else {
+      await supabase.from('post_bookmarks').delete().match({ post_id: post.id, user_id: user.id })
+      toast.success('Removed from bookmarks')
     }
   }
 
@@ -58,6 +73,19 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
         <div className="flex items-center gap-1.5 px-4 py-2 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800">
           <Pin size={12} className="text-violet-600" />
           <span className="text-violet-700 dark:text-violet-300 text-xs font-medium">Pinned post</span>
+        </div>
+      )}
+      {/* Post type badge (non-default types only) */}
+      {post.type === 'meme' && (
+        <div className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800">
+          <Laugh size={12} className="text-amber-500" />
+          <span className="text-amber-600 dark:text-amber-300 text-xs font-medium">Meme</span>
+        </div>
+      )}
+      {post.type === 'achievement' && (
+        <div className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-100 dark:border-emerald-800">
+          <Trophy size={12} className="text-emerald-500" />
+          <span className="text-emerald-600 dark:text-emerald-300 text-xs font-medium">Achievement</span>
         </div>
       )}
 
@@ -100,9 +128,14 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             'grid gap-2 mb-3 rounded-xl overflow-hidden',
             post.media_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
           )}>
-            {post.media_urls.map((url, i) => (
-              <img key={i} src={url} alt="" className="w-full h-48 object-cover" />
-            ))}
+            {post.media_urls.map((url, i) => {
+              const isVideo = /\.(mp4|webm|mov|ogg)$/i.test(url)
+              return isVideo ? (
+                <video key={i} src={url} controls className="w-full h-48 object-cover" />
+              ) : (
+                <img key={i} src={url} alt="" className="w-full h-48 object-cover" />
+              )
+            })}
           </div>
         )}
 
@@ -129,9 +162,19 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-violet-600 transition ml-auto"
+            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-violet-600 transition"
           >
             <Share2 size={16} />
+          </button>
+
+          <button
+            onClick={toggleBookmark}
+            className={cn(
+              'flex items-center gap-1.5 text-sm transition ml-auto',
+              bookmarked ? 'text-violet-600' : 'text-slate-500 hover:text-violet-600'
+            )}
+          >
+            <Bookmark size={16} fill={bookmarked ? 'currentColor' : 'none'} />
           </button>
         </div>
       </div>

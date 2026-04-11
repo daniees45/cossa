@@ -86,6 +86,12 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      post_bookmarks: {
+        Row: { post_id: string; user_id: string; created_at: string }
+        Insert: { post_id: string; user_id: string; created_at?: string }
+        Update: never
+        Relationships: []
+      }
       post_comments: {
         Row: {
           id: string
