@@ -123,10 +123,13 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           .eq('id', currentUser.id)
           .single()
 
-        const { myPrivate, theirPublic, newPublicKeyB64 } = await ensureKeyPair(
+        const { data: encryptedPrivateKeyBlob } = await supabase.rpc('get_encrypted_private_key')
+
+        const { myPrivate, theirPublic, newPublicKeyB64, newEncryptedPrivateKeyBlob } = await ensureKeyPair(
           currentUser.id,
           otherUser.public_key ?? null,
           me?.public_key ?? null,
+          (encryptedPrivateKeyBlob as string | null) ?? null,
         )
 
         if (cancelled) return
@@ -135,6 +138,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         theirPubRef.current = theirPublic
         if (newPublicKeyB64) {
           await supabase.from('profiles').update({ public_key: newPublicKeyB64 }).eq('id', currentUser.id)
+        }
+        if (newEncryptedPrivateKeyBlob) {
+          await supabase.rpc('set_encrypted_private_key', { p_blob: newEncryptedPrivateKeyBlob })
         }
         setE2eActive(!!theirPublic)
       } catch (error) {

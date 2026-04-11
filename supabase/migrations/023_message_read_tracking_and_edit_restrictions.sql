@@ -27,6 +27,59 @@ ADD COLUMN IF NOT EXISTS edited_at timestamptz;
 ALTER TABLE messages
 ADD COLUMN IF NOT EXISTS is_edited boolean DEFAULT false;
 
+-- Store encrypted private key backup (for multi-device restore while online)
+ALTER TABLE profiles
+ADD COLUMN IF NOT EXISTS encrypted_private_key text;
+
+-- Save encrypted private key blob for the authenticated user
+CREATE OR REPLACE FUNCTION set_encrypted_private_key(
+  p_blob text
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+BEGIN
+  IF v_user_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'Not authenticated');
+  END IF;
+
+  UPDATE profiles
+  SET encrypted_private_key = p_blob
+  WHERE id = v_user_id;
+
+  RETURN json_build_object('ok', true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION set_encrypted_private_key(text) TO authenticated;
+
+-- Read encrypted private key blob for the authenticated user
+CREATE OR REPLACE FUNCTION get_encrypted_private_key()
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_blob text;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT encrypted_private_key INTO v_blob
+  FROM profiles
+  WHERE id = v_user_id;
+
+  RETURN v_blob;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_encrypted_private_key() TO authenticated;
+
 -- Function to check if message is seen (has been read by recipient)
 CREATE OR REPLACE FUNCTION is_message_seen(p_message_id uuid, p_viewer_id uuid)
 RETURNS boolean
@@ -165,6 +218,38 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION mark_message_viewed(uuid) TO authenticated;
+
+-- RPC to mark all currently visible channel messages as viewed by the current user
+CREATE OR REPLACE FUNCTION mark_channel_messages_viewed(
+  p_channel_id uuid
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+BEGIN
+  IF v_user_id IS NULL THEN
+    RETURN json_build_object('ok', false, 'error', 'Not authenticated');
+  END IF;
+
+  INSERT INTO message_views (message_id, viewer_id)
+  SELECT m.id, v_user_id
+  FROM messages m
+  WHERE m.channel_id = p_channel_id
+    AND m.sender_id <> v_user_id
+    AND NOT EXISTS (
+      SELECT 1 FROM message_views mv
+      WHERE mv.message_id = m.id
+        AND mv.viewer_id = v_user_id
+    );
+
+  RETURN json_build_object('ok', true);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION mark_channel_messages_viewed(uuid) TO authenticated;
 
 -- Trigger to automatically track when messages are read
 CREATE OR REPLACE FUNCTION on_message_read()

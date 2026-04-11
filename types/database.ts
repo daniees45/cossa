@@ -23,6 +23,7 @@ export interface Database {
           role: 'student' | 'admin' | 'super_admin'
           index_number: string | null
           public_key: string | null
+          encrypted_private_key: string | null
           is_banned: boolean
           ban_reason: string | null
           created_at: string
@@ -40,6 +41,7 @@ export interface Database {
           role?: 'student' | 'admin' | 'super_admin'
           index_number?: string | null
           public_key?: string | null
+          encrypted_private_key?: string | null
           is_banned?: boolean
           ban_reason?: string | null
           created_at?: string
@@ -56,6 +58,7 @@ export interface Database {
           role?: 'student' | 'admin' | 'super_admin'
           index_number?: string | null
           public_key?: string | null
+          encrypted_private_key?: string | null
           is_banned?: boolean
           ban_reason?: string | null
         }
@@ -739,6 +742,49 @@ export interface Database {
           p_user_id: string
         }
         Returns: { ok: boolean; error?: string; self_left?: boolean }
+      }
+      is_message_seen: {
+        Args: {
+          p_message_id: string
+          p_viewer_id: string
+        }
+        Returns: boolean
+      }
+      check_can_edit_message: {
+        Args: {
+          p_message_id: string
+          p_user_id: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      update_message: {
+        Args: {
+          p_message_id: string
+          p_new_content: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      mark_message_viewed: {
+        Args: {
+          p_message_id: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      mark_channel_messages_viewed: {
+        Args: {
+          p_channel_id: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      set_encrypted_private_key: {
+        Args: {
+          p_blob: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      get_encrypted_private_key: {
+        Args: Record<string, never>
+        Returns: string | null
       }
       log_admin_action: {
         Args: {

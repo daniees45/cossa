@@ -249,6 +249,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           setMessages(msgs)
           setHasMore(data.length === 50)
           loadReactions(msgs.map((m) => m.id))
+          markChannelSeen()
         }
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       })
@@ -262,6 +263,10 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         setMessages((prev) =>
           prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
         )
+        if (msg.sender_id !== user?.id) {
+          const supabase = createClient()
+          supabase.rpc('mark_message_viewed', { p_message_id: msg.id })
+        }
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
       })
       // ── postgres_changes: fallback for multi-device / future-proofing ───────
@@ -280,6 +285,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                 ? prev
                 : [...prev, msg as unknown as MessageWithSender]
             )
+            if ((msg as { sender_id?: string }).sender_id !== user?.id) {
+              supabase.rpc('mark_message_viewed', { p_message_id: (msg as { id: string }).id })
+            }
             setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
         },
@@ -371,6 +379,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     setMessages((prev) => [...older, ...prev])
     setHasMore(data.length === 50)
     loadReactions(older.map((m) => m.id))
+    markChannelSeen()
     requestAnimationFrame(() => {
       if (container) container.scrollTop = container.scrollHeight - prevHeight
     })
@@ -449,11 +458,29 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     setEditText(msg.content)
   }
 
+  async function markChannelSeen() {
+    if (!user) return
+    const supabase = createClient()
+    await supabase.rpc('mark_channel_messages_viewed', { p_channel_id: channelId })
+  }
+
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editingId || !editText.trim()) return
     const supabase = createClient()
-    await supabase.from('messages').update({ content: editText.trim(), edited_at: new Date().toISOString() }).eq('id', editingId)
+    const { data, error } = await supabase.rpc('update_message', {
+      p_message_id: editingId,
+      p_new_content: editText.trim(),
+    })
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    const result = data as { ok: boolean; error?: string }
+    if (!result?.ok) {
+      toast.error(result?.error ?? 'Cannot edit this message')
+      return
+    }
     setEditingId(null)
     setEditText('')
   }

@@ -66,6 +66,55 @@ async function exportPublicKeyFromPrivateKey(privateKey: CryptoKey): Promise<str
   return exportPublicKey(publicKey)
 }
 
+async function exportPrivateKeyJwkString(privateKey: CryptoKey): Promise<string> {
+  const privateJwk = await crypto.subtle.exportKey('jwk', privateKey)
+  return JSON.stringify(privateJwk)
+}
+
+async function importPrivateKeyJwkString(privateJwkRaw: string): Promise<CryptoKey> {
+  const privateJwk = JSON.parse(privateJwkRaw) as JsonWebKey
+  return crypto.subtle.importKey(
+    'jwk',
+    privateJwk,
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveBits'],
+  )
+}
+
+async function deriveCloudWrapKey(userId: string): Promise<CryptoKey> {
+  const material = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`cossa-e2e-wrap-${userId}`))
+  return crypto.subtle.importKey(
+    'raw',
+    material,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt'],
+  )
+}
+
+async function encryptPrivateKeyForCloud(userId: string, privateKey: CryptoKey): Promise<string> {
+  const wrapKey = await deriveCloudWrapKey(userId)
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const raw = await exportPrivateKeyJwkString(privateKey)
+  const ct = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    wrapKey,
+    new TextEncoder().encode(raw),
+  )
+  return JSON.stringify({ v: 1, iv: b64encode(iv), ct: b64encode(new Uint8Array(ct)) })
+}
+
+async function decryptPrivateKeyFromCloud(userId: string, encryptedBlob: string): Promise<CryptoKey> {
+  const wrapKey = await deriveCloudWrapKey(userId)
+  const parsed = JSON.parse(encryptedBlob) as { v: number; iv: string; ct: string }
+  const iv = b64decode(parsed.iv)
+  const ct = b64decode(parsed.ct)
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, wrapKey, ct)
+  const jwkRaw = new TextDecoder().decode(plain)
+  return importPrivateKeyJwkString(jwkRaw)
+}
+
 // ─── Private Key: localStorage (JWK) ─────────────────────────────────────────
 
 export async function savePrivateKey(userId: string, key: CryptoKey): Promise<void> {
@@ -182,13 +231,16 @@ export async function ensureKeyPair(
   userId: string,
   theirPublicKeyB64: string | null,
   myPublicKeyB64: string | null = null,
+  myEncryptedPrivateKeyBlob: string | null = null,
 ): Promise<{
   myPrivate: CryptoKey
   theirPublic: CryptoKey | null
   newPublicKeyB64: string | null  // non-null only when a new pair was generated
+  newEncryptedPrivateKeyBlob: string | null
 }> {
   let myPrivate = await loadPrivateKey(userId)
   let newPublicKeyB64: string | null = null
+  let newEncryptedPrivateKeyBlob: string | null = null
 
   // Auto-heal stale local keys that no longer match the user's saved public key.
   if (myPrivate && myPublicKeyB64) {
@@ -205,10 +257,26 @@ export async function ensureKeyPair(
   }
 
   if (!myPrivate) {
+    if (myEncryptedPrivateKeyBlob) {
+      try {
+        myPrivate = await decryptPrivateKeyFromCloud(userId, myEncryptedPrivateKeyBlob)
+        await savePrivateKey(userId, myPrivate)
+      } catch (error) {
+        console.warn('Failed to restore private key from cloud backup:', error)
+        myPrivate = null
+      }
+    }
+  }
+
+  if (!myPrivate) {
     const pair = await generateKeyPair()
     await savePrivateKey(userId, pair.privateKey)
     newPublicKeyB64 = await exportPublicKey(pair.publicKey)
+    newEncryptedPrivateKeyBlob = await encryptPrivateKeyForCloud(userId, pair.privateKey)
     myPrivate = pair.privateKey
+  } else if (!myEncryptedPrivateKeyBlob) {
+    // Backfill encrypted cloud backup when local key exists but remote backup does not.
+    newEncryptedPrivateKeyBlob = await encryptPrivateKeyForCloud(userId, myPrivate)
   }
 
   let theirPublic: CryptoKey | null = null
@@ -221,7 +289,7 @@ export async function ensureKeyPair(
     }
   }
 
-  return { myPrivate, theirPublic, newPublicKeyB64 }
+  return { myPrivate, theirPublic, newPublicKeyB64, newEncryptedPrivateKeyBlob }
 }
 
 // ─── Base64 utils ─────────────────────────────────────────────────────────────
