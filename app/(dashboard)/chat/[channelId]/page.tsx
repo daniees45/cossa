@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
+import { EnhancedAvatar } from '@/components/shared/EnhancedAvatar'
+import { UserProfileModal } from '@/components/shared/UserProfileModal'
 import {
   Send, ArrowLeft, Paperclip, Smile, Pencil, Trash2, X, Copy, ChevronDown, MessageCircle, Users, Settings, Bell, BellOff, LogOut,
 } from 'lucide-react'
@@ -902,7 +904,15 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
               >
               {/* Avatar */}
               {!grouped ? (
-                <Avatar src={msg.sender.avatar_url} name={msg.sender.full_name} size="sm" className="mb-0.5 shrink-0" />
+                <UserProfileModal userId={msg.sender_id} username={msg.sender.username}>
+                  <EnhancedAvatar
+                    src={msg.sender.avatar_url}
+                    name={msg.sender.full_name}
+                    size="sm"
+                    frame={(msg.sender.avatar_frame ?? 'classic') as any}
+                    className="mb-0.5 shrink-0 cursor-pointer hover:scale-110 transition-transform"
+                  />
+                </UserProfileModal>
               ) : (
                 <div className="w-7 shrink-0" />
               )}

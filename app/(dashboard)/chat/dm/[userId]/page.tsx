@@ -4,6 +4,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
+import { EnhancedAvatar } from '@/components/shared/EnhancedAvatar'
+import { UserProfileModal } from '@/components/shared/UserProfileModal'
+import { toast } from 'sonner'
 import {
   Send, ArrowLeft, Lock, LockOpen, Paperclip, Smile,
   Pencil, Trash2, CheckCheck, X, Copy, ChevronDown, MessageCircle, Settings, Bell, BellOff,
@@ -129,10 +132,16 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       const theirPub = theirPubRef.current
       const result: VisibleMsg[] = await Promise.all(
         messages.map(async (msg) => {
-          if (isEncrypted(msg.content) && myPriv && theirPub) {
+          if (isEncrypted(msg.content)) {
+            if (!myPriv || !theirPub) {
+              console.warn('E2EE keys not available, message will show as encrypted')
+              return { id: msg.id, content: '🔒 Encrypted (keys loading...)', encrypted: true }
+            }
             try {
-              return { id: msg.id, content: await decryptMessage(myPriv, theirPub, msg.content), encrypted: true }
-            } catch {
+              const decrypted = await decryptMessage(myPriv, theirPub, msg.content)
+              return { id: msg.id, content: decrypted, encrypted: true }
+            } catch (error) {
+              console.error(`Failed to decrypt message ${msg.id}:`, error)
               return { id: msg.id, content: '🔒 Unable to decrypt', encrypted: true }
             }
           }
@@ -455,17 +464,48 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editingId || !editText.trim() || !user) return
+    
     const supabase = createClient()
-    let content = editText.trim()
     const original = messages.find((m) => m.id === editingId)
-    if (original && isEncrypted(original.content) && myPrivRef.current && theirPubRef.current) {
+    
+    if (!original) {
+      setEditingId(null)
+      return
+    }
+
+    // Check if message is seen (read by recipient)
+    if (original.read_at) {
+      toast.error('Cannot edit message after recipient has seen it')
+      setEditingId(null)
+      return
+    }
+
+    let content = editText.trim()
+    if (isEncrypted(original.content) && myPrivRef.current && theirPubRef.current) {
       try {
         content = await encryptMessage(myPrivRef.current, theirPubRef.current, content)
-      } catch { /* keep plaintext */ }
+      } catch {
+        console.error('Failed to re-encrypt message')
+        toast.error('Failed to encrypt edited message')
+        setEditingId(null)
+        return
+      }
     }
-    await supabase.from('messages').update({ content, edited_at: new Date().toISOString() }).eq('id', editingId)
-    setEditingId(null)
-    setEditText('')
+
+    try {
+      await supabase
+        .from('messages')
+        .update({ content, edited_at: new Date().toISOString() })
+        .eq('id', editingId)
+        .eq('sender_id', user.id)
+
+      setEditingId(null)
+      setEditText('')
+      toast.success('Message updated')
+    } catch (error) {
+      console.error('Failed to update message:', error)
+      toast.error('Failed to update message')
+    }
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
@@ -714,7 +754,15 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               >
               {/* Avatar */}
               {!grouped ? (
-                <Avatar src={msg.sender.avatar_url} name={msg.sender.full_name} size="sm" className="mb-0.5 shrink-0" />
+                <UserProfileModal userId={msg.sender_id} username={msg.sender.username}>
+                  <EnhancedAvatar
+                    src={msg.sender.avatar_url}
+                    name={msg.sender.full_name}
+                    size="sm"
+                    frame={(msg.sender.avatar_frame ?? 'classic') as any}
+                    className="mb-0.5 shrink-0 cursor-pointer hover:scale-110 transition-transform"
+                  />
+                </UserProfileModal>
               ) : (
                 <div className="w-7 shrink-0" />
               )}

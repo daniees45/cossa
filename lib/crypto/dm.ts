@@ -116,12 +116,26 @@ export async function decryptMessage(
   theirPublic: CryptoKey,
   cipherJSON: string,
 ): Promise<string> {
-  const { iv: ivB64, ct: ctB64 } = JSON.parse(cipherJSON)
-  const iv = b64decode(ivB64)
-  const ct = b64decode(ctB64)
-  const aesKey = await deriveSharedAESKey(myPrivate, theirPublic)
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ct)
-  return new TextDecoder().decode(plain)
+  try {
+    if (!myPrivate || !theirPublic) {
+      throw new Error('Missing encryption keys')
+    }
+    
+    const parsed = JSON.parse(cipherJSON)
+    if (!parsed.iv || !parsed.ct) {
+      throw new Error('Invalid encrypted message format')
+    }
+    
+    const { iv: ivB64, ct: ctB64 } = parsed
+    const iv = b64decode(ivB64)
+    const ct = b64decode(ctB64)
+    const aesKey = await deriveSharedAESKey(myPrivate, theirPublic)
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ct)
+    return new TextDecoder().decode(plain)
+  } catch (error) {
+    console.error('Decryption failed:', error)
+    throw error
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -166,7 +180,8 @@ export async function ensureKeyPair(
   if (theirPublicKeyB64) {
     try {
       theirPublic = await importPublicKey(theirPublicKeyB64)
-    } catch {
+    } catch (error) {
+      console.warn('Failed to import their public key:', error)
       theirPublic = null
     }
   }
