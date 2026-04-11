@@ -7,7 +7,7 @@ import { Badge } from '@/components/shared/Badge'
 import { PostCard } from '@/components/social/PostCard'
 import { FeedSkeleton } from '@/components/social/FeedSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { MessageSquare, UserPlus, UserMinus, LayoutGrid } from 'lucide-react'
+import { MessageSquare, UserPlus, UserMinus, LayoutGrid, GraduationCap, Share2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -72,6 +72,32 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     },
   })
 
+  const { data: followingCount } = useQuery({
+    queryKey: ['following-count', profile?.id],
+    enabled: !!profile,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { count } = await supabase
+        .from('followers')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', profile!.id)
+      return count ?? 0
+    },
+  })
+
+  const { data: postCount } = useQuery({
+    queryKey: ['post-count', profile?.id],
+    enabled: !!profile,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { count } = await supabase
+        .from('posts')
+        .select('*', { count: 'exact', head: true })
+        .eq('author_id', profile!.id)
+      return count ?? 0
+    },
+  })
+
   const { mutate: toggleFollow } = useMutation({
     mutationFn: async () => {
       const supabase = createClient()
@@ -100,7 +126,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">{profile.full_name}</h1>
             <p className="text-slate-400 text-sm">@{profile.username}</p>
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {profile.level && <Badge variant="info">Level {profile.level}</Badge>}
               {profile.role !== 'student' && (
                 <Badge variant={profile.role === 'super_admin' ? 'danger' : 'warning'}>
@@ -108,12 +134,58 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-slate-400 mt-1">{followerCount} followers</p>
+            {profile.department && (
+              <p className="flex items-center gap-1 text-xs text-slate-400 mt-1">
+                <GraduationCap size={11} />
+                {profile.department}
+              </p>
+            )}
+            {/* Stats row */}
+            <div className="flex items-center gap-4 mt-2">
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{postCount ?? '—'}</p>
+                <p className="text-[10px] text-slate-400">Posts</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{followerCount ?? '—'}</p>
+                <p className="text-[10px] text-slate-400">Followers</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{followingCount ?? '—'}</p>
+                <p className="text-[10px] text-slate-400">Following</p>
+              </div>
+            </div>
           </div>
         </div>
 
         {profile.bio && (
           <p className="text-sm text-slate-600 dark:text-slate-300 mt-4">{profile.bio}</p>
+        )}
+
+        {isMe && (
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => router.push('/profile/edit')}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition"
+            >
+              Edit Profile
+            </button>
+            <button
+              onClick={async () => {
+                const url = `${window.location.origin}/profile/${profile.username}`
+                if (navigator.share) {
+                  try { await navigator.share({ title: profile.full_name, url }) } catch { /* cancelled */ }
+                } else {
+                  await navigator.clipboard.writeText(url)
+                  toast.success('Profile link copied!')
+                }
+              }}
+              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:border-violet-400 hover:text-violet-600 transition"
+              title="Share profile"
+            >
+              <Share2 size={16} />
+            </button>
+          </div>
         )}
 
         {!isMe && me && (

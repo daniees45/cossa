@@ -3,10 +3,12 @@ import { MobileNav } from '@/components/layout/MobileNav'
 import { Topbar } from '@/components/layout/Topbar'
 import { RealtimeProvider } from '@/components/layout/RealtimeProvider'
 import { DialogProvider } from '@/components/shared/DialogProvider'
+import { NavigationProgress } from '@/components/shared/NavigationProgress'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <RealtimeProvider>
+      <NavigationProgress />
       <DialogProvider>
         <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
           <Sidebar />
