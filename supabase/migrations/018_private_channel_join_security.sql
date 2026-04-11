@@ -10,6 +10,18 @@ ALTER TABLE channels ADD COLUMN IF NOT EXISTS private_join_mode text NOT NULL DE
   CHECK (private_join_mode IN ('approval', 'code'));
 ALTER TABLE channels ADD COLUMN IF NOT EXISTS private_entry_code text;
 
+ALTER TABLE channels DROP CONSTRAINT IF EXISTS channels_private_code_consistency;
+ALTER TABLE channels ADD CONSTRAINT channels_private_code_consistency CHECK (
+  (
+    type = 'private'
+    AND private_join_mode = 'code'
+    AND private_entry_code IS NOT NULL
+    AND length(trim(private_entry_code)) > 0
+  )
+  OR (type = 'private' AND private_join_mode = 'approval')
+  OR (type <> 'private' AND private_entry_code IS NULL)
+);
+
 -- Join requests (used for approval flow)
 CREATE TABLE IF NOT EXISTS channel_join_requests (
   id          uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
