@@ -1,11 +1,11 @@
 'use client'
-import { useEffect, useRef, useState, use } from 'react'
+import React, { useEffect, useRef, useState, use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import {
-  Send, ArrowLeft, Paperclip, Smile, Pencil, Trash2, X,
+  Send, ArrowLeft, Paperclip, Smile, Pencil, Trash2, X, Copy, ChevronDown, MessageCircle, Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { timeAgo } from '@/lib/utils/formatDate'
@@ -16,6 +16,18 @@ import { useChatStore } from '@/lib/stores/chatStore'
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
 type Reaction = { emoji: string; count: number; byMe: boolean }
+
+function sameDay(a: string, b: string) {
+  const da = new Date(a), db = new Date(b)
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate()
+}
+function formatDay(iso: string) {
+  const d = new Date(iso), today = new Date()
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+  if (sameDay(iso, today.toISOString())) return 'Today'
+  if (sameDay(iso, yesterday.toISOString())) return 'Yesterday'
+  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
+}
 
 export default function ChannelPage({ params }: { params: Promise<{ channelId: string }> }) {
   const { channelId } = use(params)
@@ -51,6 +63,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [showScrollBtn, setShowScrollBtn] = useState(false)
 
   const { data: channel } = useQuery({
     queryKey: ['channel', channelId],
@@ -58,6 +72,15 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       const supabase = createClient()
       const { data } = await supabase.from('channels').select('*').eq('id', channelId).single()
       return data as Channel
+    },
+  })
+
+  const { data: memberCount } = useQuery({
+    queryKey: ['channel-members', channelId],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', channelId)
+      return count ?? 0
     },
   })
 
@@ -206,6 +229,15 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, user])
 
+  // Scroll-to-bottom button
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const handler = () => setShowScrollBtn(el.scrollHeight - el.scrollTop - el.clientHeight > 150)
+    el.addEventListener('scroll', handler)
+    return () => el.removeEventListener('scroll', handler)
+  }, [])
+
   async function loadOlderMessages() {
     if (!messages.length || loadingOlder) return
     setLoadingOlder(true)
@@ -286,7 +318,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     e.target.value = ''
   }
 
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setText(e.target.value)
     const now = Date.now()
     if (now - lastTypeBroadcastRef.current > 2000 && typingChRef.current) {
@@ -314,6 +346,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   }
 
   async function deleteMessage(id: string) {
+    if (!confirm('Delete this message?')) return
     const supabase = createClient()
     await supabase.from('messages').delete().eq('id', id)
   }
@@ -343,9 +376,12 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         </div>
         <div>
           <p className="font-semibold text-slate-900 dark:text-white text-sm">{channel?.name}</p>
-          {channel?.description && (
-            <p className="text-xs text-slate-400">{channel.description}</p>
-          )}
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            {channel?.description && <span className="truncate">{channel.description}</span>}
+            {memberCount !== undefined && (
+              <span className="flex items-center gap-0.5 shrink-0"><Users size={10} /> {memberCount} {memberCount === 1 ? 'member' : 'members'}</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -363,20 +399,38 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           </div>
         )}
 
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+              <MessageCircle size={22} className="text-slate-400" />
+            </div>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No messages yet</p>
+            <p className="text-xs text-slate-400 mt-1">Be the first to say something in #{channel?.name}!</p>
+          </div>
+        )}
+
         {messages.map((msg, i) => {
           const isOwn = msg.sender_id === user?.id
           const prevMsg = messages[i - 1]
+          const showDateSep = !prevMsg || !sameDay(prevMsg.created_at, msg.created_at)
           const grouped =
-            prevMsg &&
+            prevMsg && !showDateSep &&
             prevMsg.sender_id === msg.sender_id &&
             new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() < 60000
           const msgReactions = reactions[msg.id] ?? []
 
           return (
-            <div
-              key={msg.id}
-              className={cn('group flex items-end gap-1', isOwn && 'flex-row-reverse', grouped && 'mt-0.5')}
-            >
+            <React.Fragment key={msg.id}>
+              {showDateSep && (
+                <div className="flex items-center gap-2 py-3 my-1">
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-[11px] text-slate-400 font-medium px-2 whitespace-nowrap">{formatDay(msg.created_at)}</span>
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                </div>
+              )}
+              <div
+                className={cn('group flex items-end gap-1', isOwn && 'flex-row-reverse', grouped && 'mt-0.5')}
+              >
               {/* Avatar */}
               {!grouped ? (
                 <Avatar src={msg.sender.avatar_url} name={msg.sender.full_name} size="sm" className="mb-0.5 shrink-0" />
@@ -511,8 +565,17 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                     </button>
                   </>
                 )}
+                {/* Copy */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(msg.content) }}
+                  className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                  title="Copy message"
+                >
+                  <Copy size={13} />
+                </button>
               </div>
             </div>
+            </React.Fragment>
           )
         })}
 
@@ -529,6 +592,18 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
+          </div>
+        )}
+
+        {showScrollBtn && (
+          <div className="sticky bottom-4 flex justify-end pr-2 pointer-events-none">
+            <button
+              onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              className="pointer-events-auto w-9 h-9 rounded-full bg-violet-600 shadow-lg flex items-center justify-center text-white hover:bg-violet-500 transition"
+              title="Jump to latest"
+            >
+              <ChevronDown size={16} />
+            </button>
           </div>
         )}
 
@@ -562,8 +637,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
       {/* Input */}
       <form
+        ref={formRef}
         onSubmit={sendMessage}
-        className="flex items-center gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
+        className="flex items-end gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
       >
         <input
           ref={fileInputRef}
@@ -575,21 +651,25 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0"
+          className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0 mb-0.5"
           title="Attach file"
         >
           <Paperclip size={18} />
         </button>
-        <input
+        <textarea
           value={text}
           onChange={handleInputChange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); formRef.current?.requestSubmit() }
+          }}
+          rows={1}
           placeholder="Type a message…"
-          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500"
+          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500 resize-none max-h-32 overflow-y-auto"
         />
         <button
           type="submit"
           disabled={(!text.trim() && !mediaFile) || sending || uploading}
-          className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0"
+          className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
         >
           <Send size={16} className="text-white" />
         </button>

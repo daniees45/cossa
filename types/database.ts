@@ -379,6 +379,7 @@ export interface Database {
           media_url: string | null
           read_at: string | null
           edited_at: string | null
+          deleted_for_sender: boolean
           created_at: string
         }
         Insert: {
@@ -397,6 +398,7 @@ export interface Database {
           media_url?: string | null
           read_at?: string | null
           edited_at?: string | null
+          deleted_for_sender?: boolean
         }
         Relationships: []
       }

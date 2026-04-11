@@ -1,12 +1,12 @@
 'use client'
-import { useEffect, useRef, useState, useCallback, use } from 'react'
+import React, { useEffect, useRef, useState, useCallback, use } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import {
   Send, ArrowLeft, Lock, LockOpen, Paperclip, Smile,
-  Pencil, Trash2, CheckCheck, X,
+  Pencil, Trash2, CheckCheck, X, Copy, ChevronDown, MessageCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { timeAgo } from '@/lib/utils/formatDate'
@@ -24,6 +24,18 @@ import {
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
 type VisibleMsg = { id: string; content: string; encrypted: boolean }
 type Reaction = { emoji: string; count: number; byMe: boolean }
+
+function sameDay(a: string, b: string) {
+  const da = new Date(a), db = new Date(b)
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate()
+}
+function formatDay(iso: string) {
+  const d = new Date(iso), today = new Date()
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+  if (sameDay(iso, today.toISOString())) return 'Today'
+  if (sameDay(iso, yesterday.toISOString())) return 'Yesterday'
+  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
+}
 
 export default function DMPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params)
@@ -62,6 +74,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const lastTypeBroadcastRef = useRef(0)
   const typingChRef = useRef<RealtimeChannel | null>(null)
   const dmChannelRef = useRef<RealtimeChannel | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+  const [showScrollBtn, setShowScrollBtn] = useState(false)
+  const [otherOnline, setOtherOnline] = useState(false)
 
   // ── Scroll refs ──────────────────────────────────────────────────────────
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -241,7 +256,12 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'messages' },
         (payload) => {
-          const u = payload.new as { id: string; content: string; edited_at: string | null; read_at: string | null }
+          const u = payload.new as { id: string; content: string; edited_at: string | null; read_at: string | null; deleted_for_sender: boolean; sender_id: string }
+          // If sender marked this deleted for themselves, remove from their state
+          if (u.deleted_for_sender && u.sender_id === user.id) {
+            setMessages((prev) => prev.filter((m) => m.id !== u.id))
+            return
+          }
           setMessages((prev) =>
             prev.map((m) =>
               m.id === u.id
@@ -274,7 +294,13 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           })
         },
       )
-      .subscribe()
+      .on('presence', { event: 'sync' }, () => {
+        const state = dmChannel.presenceState<{ user_id: string }>()
+        setOtherOnline(Object.values(state).flat().some((p) => p.user_id === userId))
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') await dmChannel.track({ user_id: user.id })
+      })
     dmChannelRef.current = dmChannel
     const typingKey = `typing-dm-${[user.id, userId].sort().join('-')}`
     const typingCh = supabase
@@ -294,6 +320,15 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
     }
   }, [user, userId, loadReactions, clearDmUnread, qc])
+
+  // Scroll-to-bottom button
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const handler = () => setShowScrollBtn(el.scrollHeight - el.scrollTop - el.clientHeight > 150)
+    el.addEventListener('scroll', handler)
+    return () => el.removeEventListener('scroll', handler)
+  }, [])
 
   // ── Load older messages ──────────────────────────────────────────────────
   async function loadOlderMessages() {
@@ -386,7 +421,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   }
 
   // ── Typing broadcast ──────────────────────────────────────────────────────
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setText(e.target.value)
     const now = Date.now()
     if (now - lastTypeBroadcastRef.current > 2000 && typingChRef.current) {
@@ -419,9 +454,17 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  async function deleteMessage(id: string) {
+  async function deleteMessage(msg: MessageWithSender) {
+    if (!confirm('Delete this message?')) return
     const supabase = createClient()
-    await supabase.from('messages').delete().eq('id', id)
+    if (msg.read_at) {
+      // Already read by receiver → soft-delete (hide from sender only)
+      await supabase.from('messages').update({ deleted_for_sender: true }).eq('id', msg.id)
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id))
+    } else {
+      // Not yet read → hard-delete (removes from both sides)
+      await supabase.from('messages').delete().eq('id', msg.id)
+    }
   }
 
   // ── Reaction toggle ───────────────────────────────────────────────────────
@@ -459,8 +502,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           <>
             <Avatar src={other.avatar_url} name={other.full_name} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-slate-900 dark:text-white text-sm">{other.full_name}</p>
-              <p className="text-xs text-slate-400">@{other.username}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold text-slate-900 dark:text-white text-sm">{other.full_name}</p>
+                {otherOnline && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Online" />}
+              </div>
+              <p className="text-xs text-slate-400">{otherOnline ? 'Online' : `@${other.username}`}</p>
             </div>
             <div
               title={e2eActive ? 'End-to-end encrypted' : 'No encryption'}
@@ -492,11 +538,24 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           </div>
         )}
 
-        {messages.map((msg, i) => {
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+              <MessageCircle size={22} className="text-slate-400" />
+            </div>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No messages yet</p>
+            <p className="text-xs text-slate-400 mt-1">Say hi to {other?.full_name ?? 'them'}!</p>
+          </div>
+        )}
+
+        {messages
+          .filter((m) => !(m.deleted_for_sender && m.sender_id === user?.id))
+          .map((msg, i) => {
           const isOwn = msg.sender_id === user?.id
           const prevMsg = messages[i - 1]
+          const showDateSep = !prevMsg || !sameDay(prevMsg.created_at, msg.created_at)
           const grouped =
-            prevMsg &&
+            prevMsg && !showDateSep &&
             prevMsg.sender_id === msg.sender_id &&
             new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime() < 60000
           const display = visibleMap.get(msg.id)
@@ -505,10 +564,17 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           const msgReactions = reactions[msg.id] ?? []
 
           return (
-            <div
-              key={msg.id}
-              className={cn('group flex items-end gap-1', isOwn && 'flex-row-reverse', grouped && 'mt-0.5')}
-            >
+            <React.Fragment key={msg.id}>
+              {showDateSep && (
+                <div className="flex items-center gap-2 py-3 my-1">
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-[11px] text-slate-400 font-medium px-2 whitespace-nowrap">{formatDay(msg.created_at)}</span>
+                  <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
+                </div>
+              )}
+              <div
+                className={cn('group flex items-end gap-1', isOwn && 'flex-row-reverse', grouped && 'mt-0.5')}
+              >
               {/* Avatar */}
               {!grouped ? (
                 <Avatar src={msg.sender.avatar_url} name={msg.sender.full_name} size="sm" className="mb-0.5 shrink-0" />
@@ -639,22 +705,37 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 {/* Edit / delete (own messages only) */}
                 {isOwn && editingId !== msg.id && (
                   <>
+                    {/* Edit: only allowed if receiver has NOT yet read the message */}
+                    {!msg.read_at && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startEdit(msg) }}
+                        className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                        title="Edit message"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    )}
+                    {/* Delete: always allowed for sender */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); startEdit(msg) }}
-                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteMessage(msg.id) }}
+                      onClick={(e) => { e.stopPropagation(); deleteMessage(msg) }}
                       className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500"
+                      title={msg.read_at ? 'Remove from your view' : 'Delete message'}
                     >
                       <Trash2 size={13} />
                     </button>
                   </>
                 )}
+                {/* Copy */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(content) }}
+                  className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                  title="Copy message"
+                >
+                  <Copy size={13} />
+                </button>
               </div>
             </div>
+            </React.Fragment>
           )
         })}
 
@@ -669,6 +750,18 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
+          </div>
+        )}
+
+        {showScrollBtn && (
+          <div className="sticky bottom-4 flex justify-end pr-2 pointer-events-none">
+            <button
+              onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              className="pointer-events-auto w-9 h-9 rounded-full bg-violet-600 shadow-lg flex items-center justify-center text-white hover:bg-violet-500 transition"
+              title="Jump to latest"
+            >
+              <ChevronDown size={16} />
+            </button>
           </div>
         )}
 
@@ -702,8 +795,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
       {/* Input */}
       <form
+        ref={formRef}
         onSubmit={sendMessage}
-        className="flex items-center gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
+        className="flex items-end gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
       >
         <input
           ref={fileInputRef}
@@ -715,21 +809,25 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0"
+          className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0 mb-0.5"
           title="Attach file"
         >
           <Paperclip size={18} />
         </button>
-        <input
+        <textarea
           value={text}
           onChange={handleInputChange}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); formRef.current?.requestSubmit() }
+          }}
+          rows={1}
           placeholder={e2eActive ? `Message ${other?.full_name ?? ''} (encrypted)…` : `Message ${other?.full_name ?? ''}…`}
-          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500"
+          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500 resize-none max-h-32 overflow-y-auto"
         />
         <button
           type="submit"
           disabled={(!text.trim() && !mediaFile) || uploading}
-          className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0"
+          className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
         >
           <Send size={16} className="text-white" />
         </button>
