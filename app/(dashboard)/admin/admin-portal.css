@@ -1,0 +1,88 @@
+.admin-portal-skin {
+  --admin-panel: rgba(15, 23, 42, 0.68);
+  --admin-panel-soft: rgba(15, 23, 42, 0.45);
+  --admin-border: rgba(148, 163, 184, 0.24);
+  --admin-text: #e2e8f0;
+  --admin-muted: #94a3b8;
+  --admin-accent: #22d3ee;
+}
+
+.admin-portal-skin > * {
+  animation: admin-reveal 220ms ease-out both;
+}
+
+@keyframes admin-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin-portal-skin h1,
+.admin-portal-skin h2,
+.admin-portal-skin h3,
+.admin-portal-skin .text-slate-900,
+.admin-portal-skin .dark\:text-white {
+  color: var(--admin-text) !important;
+}
+
+.admin-portal-skin .text-slate-500,
+.admin-portal-skin .text-slate-400,
+.admin-portal-skin .dark\:text-slate-400 {
+  color: var(--admin-muted) !important;
+}
+
+.admin-portal-skin .bg-white,
+.admin-portal-skin .dark\:bg-slate-800,
+.admin-portal-skin .dark\:bg-slate-900,
+.admin-portal-skin .bg-slate-50,
+.admin-portal-skin .dark\:bg-slate-700\/50 {
+  background: var(--admin-panel) !important;
+  backdrop-filter: blur(8px);
+}
+
+.admin-portal-skin .border-slate-200,
+.admin-portal-skin .dark\:border-slate-700,
+.admin-portal-skin .dark\:border-slate-800,
+.admin-portal-skin .border-slate-100 {
+  border-color: var(--admin-border) !important;
+}
+
+.admin-portal-skin input,
+.admin-portal-skin select,
+.admin-portal-skin textarea {
+  background: var(--admin-panel-soft) !important;
+  color: var(--admin-text) !important;
+  border-color: var(--admin-border) !important;
+}
+
+.admin-portal-skin input::placeholder,
+.admin-portal-skin textarea::placeholder {
+  color: #64748b !important;
+}
+
+.admin-portal-skin table thead {
+  background: rgba(30, 41, 59, 0.72) !important;
+}
+
+.admin-portal-skin .hover\:bg-slate-50:hover,
+.admin-portal-skin .hover\:bg-slate-100:hover,
+.admin-portal-skin .dark\:hover\:bg-slate-700\/30:hover,
+.admin-portal-skin .dark\:hover\:bg-slate-700:hover {
+  background: rgba(51, 65, 85, 0.55) !important;
+}
+
+.admin-portal-skin .focus\:ring-violet-500:focus,
+.admin-portal-skin .focus\:ring-2:focus {
+  --tw-ring-color: rgba(34, 211, 238, 0.48) !important;
+}
+
+.admin-portal-skin .bg-violet-600,
+.admin-portal-skin .hover\:bg-violet-700:hover,
+.admin-portal-skin .hover\:bg-violet-500:hover {
+  background: linear-gradient(135deg, #0891b2, #0ea5e9) !important;
+}

@@ -561,17 +561,32 @@ export default function AdminElectionsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-elections'] }),
   })
 
+  const electionList = elections ?? []
+  const draftCount = electionList.filter((e) => e.status === 'draft').length
+  const activeCount = electionList.filter((e) => e.status === 'active').length
+  const closedCount = electionList.filter((e) => e.status === 'closed').length
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="font-bold text-slate-900 dark:text-white text-lg">Elections</h2>
-        <button
-          onClick={() => setCreating(!creating)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 transition"
-        >
-          <Plus size={16} />
-          New Election
-        </button>
+      <div className="rounded-2xl border border-cyan-300/25 bg-gradient-to-r from-cyan-500/15 via-slate-900/20 to-emerald-500/10 p-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Election Command</h2>
+            <p className="mt-1 text-sm text-slate-300">Create ballots, configure eligibility, and monitor campaign flow.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">Draft: {draftCount}</span>
+            <span className="rounded-full border border-emerald-300/25 bg-emerald-500/15 px-3 py-1 text-xs text-emerald-200">Active: {activeCount}</span>
+            <span className="rounded-full border border-slate-300/25 bg-slate-500/15 px-3 py-1 text-xs text-slate-200">Closed: {closedCount}</span>
+            <button
+              onClick={() => setCreating(!creating)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 transition"
+            >
+              <Plus size={16} />
+              New Election
+            </button>
+          </div>
+        </div>
       </div>
 
       {creating && (

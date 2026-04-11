@@ -71,6 +71,11 @@ export default function AdminAuditPage() {
     })
   }, [logs, actionFilter, actorFilter, dateFrom, dateTo, search])
 
+  const uniqueActors = useMemo(
+    () => new Set(logs.map((l) => l.actor?.username).filter(Boolean)).size,
+    [logs],
+  )
+
   function exportCsv() {
     if (filteredLogs.length === 0) return
     const headers = ['created_at', 'actor_full_name', 'actor_username', 'action', 'target_type', 'target_id', 'details_json']
@@ -97,9 +102,18 @@ export default function AdminAuditPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="font-bold text-slate-900 dark:text-white text-lg">Admin Audit Logs</h2>
-        <p className="text-sm text-slate-500 mt-0.5">Track role, moderation, and report actions</p>
+      <div className="rounded-2xl border border-cyan-300/25 bg-gradient-to-r from-cyan-500/15 via-slate-900/20 to-emerald-500/10 p-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Audit Console</h2>
+            <p className="mt-1 text-sm text-slate-300">Track role changes, moderation actions, and security-sensitive operations.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">Total logs: {logs.length}</span>
+            <span className="rounded-full border border-cyan-300/25 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-200">Filtered: {filteredLogs.length}</span>
+            <span className="rounded-full border border-emerald-300/25 bg-emerald-500/15 px-3 py-1 text-xs text-emerald-200">Actors: {uniqueActors}</span>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-3">

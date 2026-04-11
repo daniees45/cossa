@@ -105,7 +105,7 @@ export default function AdminNotificationsPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Broadcast Notifications</h1>
         <p className="text-sm text-slate-500 mt-0.5">Send a notification to all students or a specific year group</p>

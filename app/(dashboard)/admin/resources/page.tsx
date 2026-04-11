@@ -50,6 +50,8 @@ export default function AdminResourcesPage() {
     },
   })
 
+  const resourceLevels = new Set(resources.map((r) => r.level).filter(Boolean)).size
+
   const { mutate: deleteResource } = useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient()
@@ -132,18 +134,24 @@ export default function AdminResourcesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Resources</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Upload academic files visible to all students</p>
+      <div className="rounded-2xl border border-cyan-300/25 bg-gradient-to-r from-cyan-500/15 via-slate-900/20 to-emerald-500/10 p-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Resource Vault</h1>
+            <p className="mt-1 text-sm text-slate-300">Upload, organize, and maintain learning materials for all students.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">Files: {resources.length}</span>
+            <span className="rounded-full border border-cyan-300/25 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-200">Levels covered: {resourceLevels}</span>
+            <button
+              onClick={() => { cancelForm(); setShowForm(!showForm) }}
+              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition"
+            >
+              <Plus size={15} />
+              Upload
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => { cancelForm(); setShowForm(!showForm) }}
-          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition"
-        >
-          <Plus size={15} />
-          Upload
-        </button>
       </div>
 
       {/* Upload form */}

@@ -189,9 +189,26 @@ export default function AdminUsersPage() {
   })
 
   const pendingCount = reports.filter((r) => r.status === 'pending').length
+  const bannedCount = users.filter((u) => u.is_banned).length
+  const reportedUsersCount = new Set(reports.map((r) => r.reported_user.id)).size
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-cyan-300/25 bg-gradient-to-r from-cyan-500/15 via-slate-900/20 to-emerald-500/10 p-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">User Operations</h1>
+            <p className="mt-1 text-sm text-slate-300">Manage roles, ban status, and moderation reports from one command surface.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">Users: {users.length}</span>
+            <span className="rounded-full border border-red-300/25 bg-red-500/15 px-3 py-1 text-xs text-red-200">Banned: {bannedCount}</span>
+            <span className="rounded-full border border-amber-300/25 bg-amber-500/15 px-3 py-1 text-xs text-amber-200">Pending reports: {pendingCount}</span>
+            <span className="rounded-full border border-cyan-300/25 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-200">Reported users: {reportedUsersCount}</span>
+          </div>
+        </div>
+      </div>
+
       {/* Tab bar */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
