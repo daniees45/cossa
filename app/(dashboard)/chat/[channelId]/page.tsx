@@ -1088,7 +1088,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 pb-[calc(4.6rem+env(safe-area-inset-bottom))] md:pb-0"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 pb-[env(safe-area-inset-bottom)] md:pb-3"
         style={{ backgroundColor: channel?.banner_url ? hexToRgba(themeColor, 0.04) : undefined }}
       >
         {hasMore && (
@@ -1420,7 +1420,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       <form
         ref={formRef}
         onSubmit={sendMessage}
-        className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-3 border-t dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur"
+        className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-2 border-t dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur"
         style={{ borderColor: panelBorder, backgroundColor: hexToRgba(themeColor, 0.05) }}
       >
         <input

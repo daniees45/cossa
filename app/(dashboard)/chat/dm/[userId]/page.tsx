@@ -844,7 +844,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.05),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.12),transparent_45%)] pb-[calc(4.6rem+env(safe-area-inset-bottom))] md:pb-0">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.05),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.12),transparent_45%)] pb-[env(safe-area-inset-bottom)] md:pb-3">
         {hasMore && (
           <div className="flex justify-center pb-2">
             <button
@@ -1192,7 +1192,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       <form
         ref={formRef}
         onSubmit={sendMessage}
-        className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur"
+        className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-2 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur"
       >
         <input
           ref={fileInputRef}
