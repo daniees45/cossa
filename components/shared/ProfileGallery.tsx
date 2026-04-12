@@ -3,6 +3,7 @@ import { EnhancedAvatar } from './EnhancedAvatar'
 import { Clock, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { toast } from 'sonner'
+import { useDialog } from '@/components/shared/DialogProvider'
 
 interface ProfilePictureHistoryEntry {
   id: string
@@ -28,6 +29,8 @@ export function ProfileGallery({
   onDeletePicture,
   isEditable = false,
 }: ProfileGalleryProps) {
+  const { confirm } = useDialog()
+
   if (!pictures || pictures.length === 0) {
     return (
       <div className="p-8 rounded-lg bg-slate-50 dark:bg-slate-900 text-center">
@@ -102,9 +105,15 @@ export function ProfileGallery({
             {/* Delete button */}
             {isEditable && onDeletePicture && !picture.is_current && (
               <button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation()
-                  if (confirm('Delete this profile picture?')) {
+                  const ok = await confirm({
+                    title: 'Delete profile picture',
+                    message: 'This picture will be removed from your history.',
+                    confirmLabel: 'Delete',
+                    variant: 'danger',
+                  })
+                  if (ok) {
                     onDeletePicture(picture.id)
                   }
                 }}

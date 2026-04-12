@@ -255,10 +255,7 @@ export function resolveCloudBackupSecret(userId: string): string | null {
   const cacheKey = `${SESSION_WRAP_SECRET_PREFIX}${userId}`
   const cached = sessionStorage.getItem(cacheKey)
   if (cached) return cached
-  const entered = window.prompt('Enter your E2EE backup passphrase to enable secure key backup/recovery:')
-  if (!entered || !entered.trim()) return null
-  sessionStorage.setItem(cacheKey, entered.trim())
-  return entered.trim()
+  return null
 }
 
 async function encryptPrivateKeyForCloud(privateKey: CryptoKey, secret: string): Promise<string> {
