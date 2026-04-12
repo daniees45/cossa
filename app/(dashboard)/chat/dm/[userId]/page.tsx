@@ -31,6 +31,13 @@ const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
 type VisibleMsg = { id: string; content: string; encrypted: boolean }
 type Reaction = { emoji: string; count: number; byMe: boolean }
 
+type ChatStylePrefs = {
+  fontFamily: 'default' | 'serif' | 'monospace'
+  fontSize: '13' | '14' | '16' | '18'
+  fontWeight: '400' | '500' | '600'
+  textColor: string
+}
+
 function sameDay(a: string, b: string) {
   const da = new Date(a), db = new Date(b)
   return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate()
@@ -94,6 +101,14 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const formRef = useRef<HTMLFormElement>(null)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
   const [otherOnline, setOtherOnline] = useState(false)
+  const [mobileActionFor, setMobileActionFor] = useState<string | null>(null)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [chatStyle, setChatStyle] = useState<ChatStylePrefs>({
+    fontFamily: 'default',
+    fontSize: '14',
+    fontWeight: '400',
+    textColor: '#111827',
+  })
 
   // ── Scroll refs ──────────────────────────────────────────────────────────
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -610,6 +625,49 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   }
 
   const visibleMap = new Map(visible.map((v) => [v.id, v]))
+  const mobileActionMessage = mobileActionFor ? messages.find((m) => m.id === mobileActionFor) ?? null : null
+  const messageTextStyle: React.CSSProperties = {
+    fontFamily:
+      chatStyle.fontFamily === 'default'
+        ? undefined
+        : chatStyle.fontFamily === 'serif'
+          ? 'Georgia, ui-serif, serif'
+          : 'ui-monospace, SFMono-Regular, Menlo, monospace',
+    fontSize: `${chatStyle.fontSize}px`,
+    fontWeight: Number(chatStyle.fontWeight),
+    color: chatStyle.textColor,
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem(`dm-chat-style-${userId}`)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as Partial<ChatStylePrefs>
+      setChatStyle((prev) => ({ ...prev, ...parsed }))
+    } catch {
+      // ignore invalid settings payload
+    }
+  }, [userId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem(`dm-chat-style-${userId}`, JSON.stringify(chatStyle))
+  }, [userId, chatStyle])
+
+  function startLongPress(messageId: string) {
+    if (typeof window === 'undefined') return
+    if (!window.matchMedia('(hover: none)').matches) return
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = setTimeout(() => setMobileActionFor(messageId), 420)
+  }
+
+  function clearLongPress() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
 
   // "Seen" indicator: last sent message that has been read
   const lastReadMsgId = (() => {
@@ -622,7 +680,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const isMutedDm = mutedDms.includes(userId)
 
   return (
-    <div className="flex min-h-0 h-full flex-col" onClick={() => setPickerFor(null)}>
+    <div className="flex min-h-0 h-full flex-col pb-[calc(4.6rem+env(safe-area-inset-bottom))] md:pb-0" onClick={() => { setPickerFor(null); setMobileActionFor(null) }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur">
         <Link href="/chat" className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -713,6 +771,58 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
             {/* Actions */}
             <div className="px-4 py-3 space-y-1">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 space-y-2.5 mb-2">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Chat appearance</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-[11px] text-slate-500">
+                    Font
+                    <select
+                      value={chatStyle.fontFamily}
+                      onChange={(e) => setChatStyle((p) => ({ ...p, fontFamily: e.target.value as ChatStylePrefs['fontFamily'] }))}
+                      className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-violet-500"
+                    >
+                      <option value="default">Default</option>
+                      <option value="serif">Serif</option>
+                      <option value="monospace">Monospace</option>
+                    </select>
+                  </label>
+                  <label className="text-[11px] text-slate-500">
+                    Size
+                    <select
+                      value={chatStyle.fontSize}
+                      onChange={(e) => setChatStyle((p) => ({ ...p, fontSize: e.target.value as ChatStylePrefs['fontSize'] }))}
+                      className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-violet-500"
+                    >
+                      <option value="13">Small</option>
+                      <option value="14">Medium</option>
+                      <option value="16">Large</option>
+                      <option value="18">XL</option>
+                    </select>
+                  </label>
+                  <label className="text-[11px] text-slate-500">
+                    Weight
+                    <select
+                      value={chatStyle.fontWeight}
+                      onChange={(e) => setChatStyle((p) => ({ ...p, fontWeight: e.target.value as ChatStylePrefs['fontWeight'] }))}
+                      className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-violet-500"
+                    >
+                      <option value="400">Regular</option>
+                      <option value="500">Medium</option>
+                      <option value="600">Semibold</option>
+                    </select>
+                  </label>
+                  <label className="text-[11px] text-slate-500">
+                    Color
+                    <input
+                      type="color"
+                      value={chatStyle.textColor}
+                      onChange={(e) => setChatStyle((p) => ({ ...p, textColor: e.target.value }))}
+                      className="mt-1 h-8 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-1"
+                    />
+                  </label>
+                </div>
+              </div>
+
               <button
                 onClick={toggleMuteDm}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition"
@@ -813,6 +923,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
                       className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500 resize-none text-slate-800 dark:text-slate-200"
+                      style={messageTextStyle}
                       rows={2}
                       autoFocus
                       onKeyDown={(e) => { if (e.key === 'Escape') { setEditingId(null); setEditText('') } }}
@@ -848,7 +959,20 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                       </div>
                     )}
                     {content.trim() && (
-                      <p className="px-3 pt-2 pb-1 whitespace-pre-wrap break-words">{content}</p>
+                      <p
+                        className="px-3 pt-2 pb-1 whitespace-pre-wrap break-words"
+                        style={messageTextStyle}
+                        onTouchStart={() => startLongPress(msg.id)}
+                        onTouchEnd={clearLongPress}
+                        onTouchMove={clearLongPress}
+                        onTouchCancel={clearLongPress}
+                        onContextMenu={(e) => {
+                          e.preventDefault()
+                          setMobileActionFor(msg.id)
+                        }}
+                      >
+                        {content}
+                      </p>
                     )}
                     {/* Time + status row inside bubble */}
                     <div className={cn(
@@ -891,7 +1015,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
               {/* Hover actions: emoji picker + edit/delete */}
               <div className={cn(
-                'flex items-center gap-1 rounded-xl bg-white/80 dark:bg-slate-800/80 px-1 py-0.5 opacity-100 md:bg-transparent md:p-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity mb-1 shrink-0 backdrop-blur-sm md:backdrop-blur-0',
+                'hidden md:flex items-center gap-1 transition-opacity mb-1 shrink-0 opacity-0 group-hover:opacity-100',
                 isOwn && 'order-first flex-row-reverse',
               )}>
                 {/* Emoji picker trigger */}
@@ -986,6 +1110,59 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         <div ref={bottomRef} />
       </div>
 
+      {mobileActionMessage && (
+        <div className="fixed inset-x-3 bottom-[calc(5.2rem+env(safe-area-inset-bottom))] z-40 md:hidden">
+          <div className="rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+            <div className="mb-1 flex items-center justify-between px-1">
+              <p className="text-[11px] font-medium text-slate-500">Message actions</p>
+              <button
+                onClick={() => setMobileActionFor(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => { void toggleReaction(mobileActionMessage.id, emoji); setMobileActionFor(null) }}
+                  className="h-9 w-9 rounded-lg bg-slate-100 text-base dark:bg-slate-800"
+                >
+                  {emoji}
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  const val = visibleMap.get(mobileActionMessage.id)?.content ?? mobileActionMessage.content
+                  navigator.clipboard.writeText(val)
+                  setMobileActionFor(null)
+                }}
+                className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <Copy size={12} /> Copy
+              </button>
+              {mobileActionMessage.sender_id === user?.id && !mobileActionMessage.read_at && (
+                <button
+                  onClick={() => { startEdit(mobileActionMessage); setMobileActionFor(null) }}
+                  className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <Pencil size={12} /> Edit
+                </button>
+              )}
+              {mobileActionMessage.sender_id === user?.id && (
+                <button
+                  onClick={() => { void deleteMessage(mobileActionMessage); setMobileActionFor(null) }}
+                  className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600 dark:bg-red-900/20 dark:text-red-300"
+                >
+                  <Trash2 size={12} /> Delete
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* File preview */}
       {(mediaPreview || mediaFile) && (
         <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
@@ -1041,6 +1218,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           rows={1}
           placeholder={e2eActive ? `Message ${other?.full_name ?? ''} (encrypted)…` : `Message ${other?.full_name ?? ''}…`}
           className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500 resize-none max-h-32 overflow-y-auto"
+          style={messageTextStyle}
         />
         <button
           type="submit"
