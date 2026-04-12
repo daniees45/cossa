@@ -25,6 +25,7 @@ import {
   encryptMessage,
   decryptMessage,
   isEncrypted,
+  resolveCloudBackupSecret,
 } from '@/lib/crypto/dm'
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
@@ -84,6 +85,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const [e2eActive, setE2eActive] = useState(false)
   const myPrivRef = useRef<CryptoKey | null>(null)
   const theirPubRef = useRef<CryptoKey | null>(null)
+  const mySignPrivRef = useRef<CryptoKey | null>(null)
+  const theirSignPubRef = useRef<CryptoKey | null>(null)
 
   // ── Edit/delete ──────────────────────────────────────────────────────────
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -135,25 +138,49 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       try {
         const { data: me } = await supabase
           .from('profiles')
-          .select('public_key')
+          .select('public_key, signing_public_key')
           .eq('id', currentUser.id)
           .single()
 
         const { data: encryptedPrivateKeyBlob } = await supabase.rpc('get_encrypted_private_key')
 
-        const { myPrivate, theirPublic, newPublicKeyB64, newEncryptedPrivateKeyBlob } = await ensureKeyPair(
+        const cloudBackupSecret = resolveCloudBackupSecret(currentUser.id)
+
+        const {
+          myPrivate,
+          mySigningPrivate,
+          theirPublic,
+          theirSigningPublic,
+          newPublicKeyB64,
+          newSigningPublicKeyB64,
+          newEncryptedPrivateKeyBlob,
+        } = await ensureKeyPair(
           currentUser.id,
           otherUser.public_key ?? null,
+          otherUser.signing_public_key ?? null,
           me?.public_key ?? null,
+          me?.signing_public_key ?? null,
           (encryptedPrivateKeyBlob as string | null) ?? null,
+          cloudBackupSecret,
         )
 
         if (cancelled) return
 
         myPrivRef.current = myPrivate
+        mySignPrivRef.current = mySigningPrivate
         theirPubRef.current = theirPublic
+        theirSignPubRef.current = theirSigningPublic
         if (newPublicKeyB64) {
-          await supabase.from('profiles').update({ public_key: newPublicKeyB64 }).eq('id', currentUser.id)
+          await supabase
+            .from('profiles')
+            .update({ public_key: newPublicKeyB64 })
+            .eq('id', currentUser.id)
+        }
+        if (newSigningPublicKeyB64) {
+          await supabase
+            .from('profiles')
+            .update({ signing_public_key: newSigningPublicKeyB64 })
+            .eq('id', currentUser.id)
         }
         if (newEncryptedPrivateKeyBlob) {
           await supabase.rpc('set_encrypted_private_key', { p_blob: newEncryptedPrivateKeyBlob })
@@ -183,7 +210,17 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
               return { id: msg.id, content: '🔒 Encrypted (keys loading...)', encrypted: true }
             }
             try {
-              const decrypted = await decryptMessage(myPriv, theirPub, msg.content)
+              const expectedSenderId = msg.sender_id
+              const expectedReceiverId = msg.receiver_id ?? user?.id
+              const verifyWithPublicKey =
+                msg.sender_id === user?.id
+                  ? null
+                  : theirSignPubRef.current
+              const decrypted = await decryptMessage(myPriv, theirPub, msg.content, {
+                verifyWithPublicKey,
+                expectedSenderId,
+                expectedReceiverId,
+              })
               return { id: msg.id, content: decrypted, encrypted: true }
             } catch (error) {
               console.error(`Failed to decrypt message ${msg.id}:`, error)
@@ -196,7 +233,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 id: msg.id,
                 content: isOperationError
                   ? '🔒 Unable to decrypt (key mismatch)'
-                  : '🔒 Unable to decrypt',
+                  : '🔒 Unable to decrypt / verify',
                 encrypted: true,
               }
             }
@@ -463,7 +500,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     let content = text.trim() || ' '
     if (myPrivRef.current && theirPubRef.current && content.trim()) {
       try {
-        content = await encryptMessage(myPrivRef.current, theirPubRef.current, content)
+        content = await encryptMessage(myPrivRef.current, theirPubRef.current, content, {
+          signingPrivateKey: mySignPrivRef.current,
+          senderId: user.id,
+          receiverId: userId,
+        })
       } catch { /* fall back to plaintext */ }
     }
     setText('')
@@ -539,7 +580,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     let content = editText.trim()
     if (isEncrypted(original.content) && myPrivRef.current && theirPubRef.current) {
       try {
-        content = await encryptMessage(myPrivRef.current, theirPubRef.current, content)
+        content = await encryptMessage(myPrivRef.current, theirPubRef.current, content, {
+          signingPrivateKey: mySignPrivRef.current,
+          senderId: user.id,
+          receiverId: userId,
+        })
       } catch {
         console.error('Failed to re-encrypt message')
         toast.error('Failed to encrypt edited message')
@@ -603,25 +648,18 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
   async function clearConversation() {
     const ok = await confirm({ title: 'Clear conversation', message: 'This will hide all your sent messages from this conversation. The other person will not be affected.', confirmLabel: 'Clear', variant: 'danger' })
-    if (!ok) return
+    if (!ok || !user) return
     const supabase = createClient()
-    // Soft-delete all own messages in this DM (show update to others isn't affected)
-    supabase
-      .from('messages')
-      .update({ deleted_for_sender: true })
-      .eq('sender_id', user!.id)
-      .not('channel_id', 'is', null)
-      .then(() => {
-        // Also target DM messages (no channel_id)
-        supabase
-          .from('messages')
-          .update({ deleted_for_sender: true })
-          .eq('sender_id', user!.id)
-          .is('channel_id', null)
-          .then(() => {
-            setMessages((prev) => prev.filter((m) => m.sender_id !== user?.id))
-          })
-      })
+    const { data, error } = await supabase.rpc('clear_dm_conversation', { p_other_user: userId })
+    if (error) {
+      toast.error('Failed to clear conversation')
+      return
+    }
+    if (data && typeof data === 'object' && 'ok' in data && data.ok === false) {
+      toast.error('Failed to clear conversation')
+      return
+    }
+    setMessages((prev) => prev.filter((m) => m.sender_id !== user.id))
   }
 
   const visibleMap = new Map(visible.map((v) => [v.id, v]))

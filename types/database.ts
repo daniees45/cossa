@@ -23,6 +23,7 @@ export interface Database {
           role: 'student' | 'admin' | 'super_admin'
           index_number: string | null
           public_key: string | null
+          signing_public_key: string | null
           encrypted_private_key: string | null
           is_banned: boolean
           ban_reason: string | null
@@ -41,6 +42,7 @@ export interface Database {
           role?: 'student' | 'admin' | 'super_admin'
           index_number?: string | null
           public_key?: string | null
+          signing_public_key?: string | null
           encrypted_private_key?: string | null
           is_banned?: boolean
           ban_reason?: string | null
@@ -58,6 +60,7 @@ export interface Database {
           role?: 'student' | 'admin' | 'super_admin'
           index_number?: string | null
           public_key?: string | null
+          signing_public_key?: string | null
           encrypted_private_key?: string | null
           is_banned?: boolean
           ban_reason?: string | null
@@ -801,6 +804,12 @@ export interface Database {
       get_encrypted_private_key: {
         Args: Record<string, never>
         Returns: string | null
+      }
+      clear_dm_conversation: {
+        Args: {
+          p_other_user: string
+        }
+        Returns: { ok: boolean; updated: number; error?: string }
       }
       log_admin_action: {
         Args: {
