@@ -722,6 +722,11 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     fontWeight: Number(chatStyle.fontWeight),
     color: chatStyle.textColor,
   }
+  // iOS Safari auto-zooms inputs with font-size < 16px; clamp to 16px for inputs only
+  const inputTextStyle: React.CSSProperties = {
+    ...messageTextStyle,
+    fontSize: `${Math.max(16, Number(chatStyle.fontSize))}px`,
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -744,7 +749,10 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     if (typeof window === 'undefined') return
     if (!window.matchMedia('(hover: none)').matches) return
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
-    longPressTimerRef.current = setTimeout(() => setMobileActionFor(messageId), 420)
+    longPressTimerRef.current = setTimeout(() => {
+      navigator.vibrate?.(10)
+      setMobileActionFor(messageId)
+    }, 420)
   }
 
   function clearLongPress() {
@@ -1007,8 +1015,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                     <textarea
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
-                      className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500 resize-none text-slate-800 dark:text-slate-200"
-                      style={messageTextStyle}
+                      className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 text-base outline-none focus:ring-2 focus:ring-violet-500 resize-none text-slate-800 dark:text-slate-200"
+                      style={inputTextStyle}
                       rows={2}
                       autoFocus
                       onKeyDown={(e) => { if (e.key === 'Escape') { setEditingId(null); setEditText('') } }}
@@ -1100,7 +1108,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
               {/* Hover actions: emoji picker + edit/delete */}
               <div className={cn(
-                'hidden md:flex items-center gap-1 transition-opacity mb-1 shrink-0 opacity-0 group-hover:opacity-100',
+                'hidden md:flex items-center gap-1 transition-opacity mb-1 shrink-0 opacity-0 [@media(hover:hover)]:group-hover:opacity-100',
                 isOwn && 'order-first flex-row-reverse',
               )}>
                 {/* Emoji picker trigger */}
@@ -1302,8 +1310,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           }}
           rows={1}
           placeholder={e2eActive ? `Message ${other?.full_name ?? ''} (encrypted)…` : `Message ${other?.full_name ?? ''}…`}
-          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500 resize-none max-h-32 overflow-y-auto"
-          style={messageTextStyle}
+          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-base text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500 resize-none max-h-32 overflow-y-auto"
+          style={inputTextStyle}
         />
         <button
           type="submit"
