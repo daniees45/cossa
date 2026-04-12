@@ -6,7 +6,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import { Badge } from '@/components/shared/Badge'
 import { toast } from 'sonner'
-import { Loader2, CheckCircle2, ShieldX, ShieldCheck, X, FileText, Clock, KeyRound, AlertCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, ShieldX, ShieldCheck, X, FileText, Clock, KeyRound, AlertCircle, Sparkles } from 'lucide-react'
 import { useLiveCountdown } from '@/lib/hooks/useLiveCountdown'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/cn'
@@ -176,10 +176,10 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
   // ── Voter roll verification gate ────────────────────────────────────────────
   if (needsVerification && rollCount !== undefined && preVerified !== undefined) {
     return (
-      <div className="max-w-md mx-auto px-3 sm:px-4 py-8 sm:py-10 space-y-6">
+      <div className="mx-auto max-w-md space-y-6 px-3 py-8 sm:px-4 sm:py-10">
         <div className="text-center">
-          <div className="w-14 h-14 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-4">
-            <KeyRound size={26} className="text-violet-600" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+            <KeyRound size={26} className="text-emerald-600" />
           </div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Verify your identity</h2>
           <p className="text-slate-500 text-sm max-w-xs mx-auto">
@@ -187,7 +187,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
+        <div className="space-y-4 rounded-[1.6rem] border border-slate-200/80 bg-white/95 p-5 shadow-[0_16px_34px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-800/95">
           {election && (
             <div className="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-700">
               {election.banner_url && (
@@ -210,7 +210,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                 onChange={(e) => { setStudentId(e.target.value); setVerifyError('') }}
                 placeholder="e.g. CS/2020/001 or 10201234"
                 autoFocus
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-mono outline-none focus:ring-2 focus:ring-violet-500 uppercase placeholder:uppercase placeholder:opacity-40"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm uppercase outline-none placeholder:uppercase placeholder:opacity-40 focus:ring-2 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-900"
               />
               <p className="text-xs text-slate-400 mt-1.5">
                 Use the student ID that appears on your school voter list.
@@ -227,7 +227,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
             <button
               type="submit"
               disabled={verifying || !studentId.trim()}
-              className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-60 text-white font-semibold text-sm flex items-center justify-center gap-2 transition"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
             >
               {verifying && <Loader2 size={15} className="animate-spin" />}
               {verifying ? 'Verifying…' : 'Verify & Access Ballot'}
@@ -271,13 +271,13 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
     return (
       <div className="max-w-lg mx-auto px-3 sm:px-4 py-8 sm:py-10 space-y-6">
         <div className="text-center">
-          <CheckCircle2 size={52} className="text-green-500 mx-auto mb-4" />
+          <CheckCircle2 size={52} className="mx-auto mb-4 text-emerald-500" />
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">You&apos;ve already voted</h2>
           <p className="text-slate-500 text-sm">Your vote has been securely recorded.</p>
         </div>
 
         {voteReceipt && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_16px_34px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-800/95">
             <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Anonymous vote receipt</p>
               <p className="text-xs text-slate-400 mt-0.5">Your participation proof is stored separately from ballot selections.</p>
@@ -304,7 +304,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
           </Link>
           <Link
             href={`/vote/results/${electionId}`}
-            className="flex-1 py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold text-center transition"
+            className="flex-1 rounded-xl bg-emerald-600 py-3 text-center text-sm font-semibold text-white transition hover:bg-emerald-500"
           >
             View Results
           </Link>
@@ -314,27 +314,31 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
   }
 
   return (
-    <div className="max-w-lg mx-auto px-3 sm:px-4 pb-10 space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6 px-3 pb-10 sm:px-4">
       {/* Election header */}
       {election && (
-        <div className="pt-6">
+        <section className="overflow-hidden rounded-[1.9rem] border border-slate-200/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(236,253,245,0.92))] p-4 shadow-[0_18px_48px_rgba(15,23,42,0.08)] dark:border-slate-700/70 dark:bg-[linear-gradient(145deg,rgba(15,23,42,0.95),rgba(6,78,59,0.42))] sm:p-5">
           {election.banner_url && (
-            <img src={election.banner_url} alt="" className="w-full h-40 object-cover rounded-2xl mb-4" />
+            <img src={election.banner_url} alt="" className="mb-4 h-44 w-full rounded-2xl object-cover" />
           )}
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">{election.title}</h1>
-          {election.description && (
-            <p className="text-sm text-slate-500 mt-1">{election.description}</p>
-          )}
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-400">
-            <Clock size={12} />
-            {liveCountdown}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="inline-flex items-center gap-1 rounded-full bg-white/75 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:bg-slate-900/60 dark:text-emerald-300"><Sparkles size={10} /> Ballot live</p>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{election.title}</h1>
+              {election.description && (
+                <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">{election.description}</p>
+              )}
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-3 py-1.5 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+              <Clock size={12} /> {liveCountdown}
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* Position navigation pills — shown when there are multiple positions */}
       {positions.length > 1 && (
-        <div className="sticky top-14 z-20 -mx-4 px-4 py-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-100 dark:border-slate-800">
+        <div className="sticky top-14 z-20 -mx-4 border-y border-slate-200/70 bg-white/90 px-4 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
           <div className="flex gap-2 overflow-x-auto pb-0.5">
             {positions.map((p) => (
               <button
@@ -343,8 +347,8 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                 className={cn(
                   'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition',
                   selected[p]
-                    ? 'bg-violet-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
                 )}
               >
                 {selected[p] ? '✓ ' : ''}{p}
@@ -371,10 +375,10 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                   key={candidate.id}
                   onClick={() => setSelected({ ...selected, [position]: candidate.id })}
                   className={cn(
-                    'w-full text-left flex flex-col sm:flex-row items-start gap-4 p-4 rounded-2xl border-2 transition',
+                    'group w-full rounded-[1.45rem] border-2 p-4 text-left transition sm:flex sm:flex-row sm:items-start sm:gap-4',
                     isSelected
-                      ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
-                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-violet-300'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/15'
+                      : 'border-slate-200 bg-white hover:border-emerald-300 dark:border-slate-700 dark:bg-slate-800/95 dark:hover:border-emerald-700'
                   )}
                 >
                   <Avatar
@@ -384,22 +388,22 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                   />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 dark:text-white">{candidate.profile.full_name}</p>
-                    <Badge variant="info" className="mt-1 mb-2">Level {candidate.profile.level}</Badge>
+                    <Badge variant="info" className="mb-2 mt-1">Level {candidate.profile.level}</Badge>
                     {candidate.manifesto && (
-                      <p className="text-xs text-slate-500 line-clamp-2">{candidate.manifesto}</p>
+                      <p className="line-clamp-2 text-xs leading-5 text-slate-500 dark:text-slate-300">{candidate.manifesto}</p>
                     )}
                     {candidate.manifesto && candidate.manifesto.length > 100 && (
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setManifestoCandidate(candidate) }}
-                        className="flex items-center gap-1 mt-1.5 text-xs text-violet-600 hover:text-violet-500 font-medium"
+                        className="mt-1.5 flex items-center gap-1 text-xs font-medium text-emerald-700 transition hover:text-emerald-600 dark:text-emerald-300"
                       >
                         <FileText size={11} /> Read full manifesto
                       </button>
                     )}
                   </div>
                   {isSelected && (
-                    <CheckCircle2 size={22} className="text-violet-600 shrink-0 mt-0.5" />
+                    <CheckCircle2 size={22} className="mt-0.5 shrink-0 text-emerald-600" />
                   )}
                 </button>
               )
@@ -410,19 +414,19 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
 
       {/* Progress bar + submit */}
       {totalPositions > 0 && (
-        <div className="space-y-3">
+        <div className="sticky bottom-3 z-20 space-y-3 rounded-2xl border border-slate-200/80 bg-white/92 p-3 shadow-[0_12px_28px_rgba(15,23,42,0.12)] backdrop-blur dark:border-slate-700 dark:bg-slate-900/92">
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <p className="text-xs text-slate-500">{selectedCount} of {totalPositions} positions selected</p>
               {selectedCount === totalPositions && (
-                <p className="text-xs text-green-600 font-medium">Ready to submit!</p>
+                <p className="text-xs font-medium text-emerald-600">Ready to submit!</p>
               )}
             </div>
             <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
               <div
                 className={cn(
                   'h-2 rounded-full transition-all',
-                  selectedCount === totalPositions ? 'bg-green-500' : 'bg-violet-500'
+                  selectedCount === totalPositions ? 'bg-emerald-500' : 'bg-cyan-500'
                 )}
                 style={{ width: `${totalPositions ? (selectedCount / totalPositions) * 100 : 0}%` }}
               />
@@ -432,7 +436,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
           {selectedCount > 0 && !confirming && (
             <button
               onClick={() => setConfirming(true)}
-              className="w-full py-3.5 rounded-2xl bg-violet-600 hover:bg-violet-500 text-white font-semibold transition"
+              className="w-full rounded-xl bg-emerald-600 py-3.5 font-semibold text-white transition hover:bg-emerald-500"
             >
               {selectedCount < totalPositions
                 ? `Continue (${selectedCount}/${totalPositions} selected)`
@@ -445,7 +449,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
       {/* Confirmation modal */}
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 px-4 pb-6 md:pb-0">
-          <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl p-6 space-y-4 shadow-2xl">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
             <h3 className="font-bold text-slate-900 dark:text-white text-lg">Confirm your votes</h3>
             <p className="text-sm text-slate-500">This action cannot be undone. You can only vote once per election.</p>
             <div className="space-y-2">
@@ -472,7 +476,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
               <button
                 onClick={() => castVotes()}
                 disabled={isPending}
-                className="py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition flex items-center justify-center gap-2 disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
               >
                 {isPending && <Loader2 size={14} className="animate-spin" />}
                 Confirm
@@ -485,7 +489,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
       {/* Full manifesto modal */}
       {manifestoCandidate && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-3 sm:px-4 pb-4 sm:pb-0">
-          <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-700">
               <Avatar
                 src={manifestoCandidate.photo_url ?? manifestoCandidate.profile.avatar_url}
@@ -518,7 +522,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                   'w-full py-2.5 rounded-xl text-sm font-semibold transition',
                   selected[manifestoCandidate.position] === manifestoCandidate.id
                     ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 cursor-default'
-                    : 'bg-violet-600 hover:bg-violet-500 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
                 )}
               >
                 {selected[manifestoCandidate.position] === manifestoCandidate.id

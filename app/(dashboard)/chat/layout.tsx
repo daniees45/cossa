@@ -153,24 +153,27 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!user || !myChannelIds) return
     const supabase = createClient()
-    const ch = supabase
-      .channel(`channel-unread-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-          const row = payload.new as { channel_id: string | null; sender_id: string }
-          if (!row.channel_id) return
-          if (row.sender_id === user.id) return
-          if (!myChannelIdsRef.current?.has(row.channel_id)) return
-          if (pathnameRef.current === `/chat/${row.channel_id}`) {
-            setChannelUnread(row.channel_id, 0)
-            return
-          }
-          incChannelUnread(row.channel_id)
-        },
-      )
-      .subscribe()
+    // Use a unique topic per mount so we never re-open an already subscribed channel instance.
+    const topic = `channel-unread-${user.id}-${Date.now()}`
+    const ch = supabase.channel(topic)
+
+    ch.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages' },
+      (payload) => {
+        const row = payload.new as { channel_id: string | null; sender_id: string }
+        if (!row.channel_id) return
+        if (row.sender_id === user.id) return
+        if (!myChannelIdsRef.current?.has(row.channel_id)) return
+        if (pathnameRef.current === `/chat/${row.channel_id}`) {
+          setChannelUnread(row.channel_id, 0)
+          return
+        }
+        incChannelUnread(row.channel_id)
+      },
+    )
+
+    ch.subscribe()
 
     return () => {
       supabase.removeChannel(ch)

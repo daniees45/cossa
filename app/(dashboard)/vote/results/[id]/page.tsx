@@ -5,10 +5,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Avatar } from '@/components/shared/Avatar'
-import { Trophy, Lock } from 'lucide-react'
+import { Trophy, Lock, BarChart3 } from 'lucide-react'
 import type { CandidateWithProfile, Election } from '@/types/app'
 
-const COLORS = ['#7c3aed', '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe']
+const COLORS = ['#0f766e', '#0ea5a4', '#22c55e', '#14b8a6', '#2dd4bf']
 
 export default function ElectionResultsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -54,13 +54,22 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-8">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-white">{election?.title} — Results</h1>
-        <p className="text-slate-500 text-sm mt-1">
-          {election?.status === 'closed' ? 'Final vote count' : 'Live preview (admin only)'}
-        </p>
-      </div>
+    <div className="mx-auto max-w-4xl space-y-6 px-3 py-4 sm:px-4 sm:py-6">
+      <section className="overflow-hidden rounded-[1.9rem] border border-slate-200/80 bg-[linear-gradient(140deg,rgba(255,255,255,0.98),rgba(236,253,245,0.92))] p-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)] dark:border-slate-700/70 dark:bg-[linear-gradient(140deg,rgba(15,23,42,0.95),rgba(6,78,59,0.45))] sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700/80 dark:text-emerald-300/80">Election Results</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">{election?.title}</h1>
+            <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300">
+              {election?.status === 'closed' ? 'Final vote count' : 'Live preview (admin only)'}
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm dark:bg-slate-900/70 dark:text-emerald-300">
+            <BarChart3 size={12} />
+            {positions.length} position{positions.length !== 1 ? 's' : ''}
+          </div>
+        </div>
+      </section>
 
       {positions.map((position) => {
         const group = candidates?.filter((c) => c.position === position) ?? []
@@ -73,30 +82,28 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
         }))
 
         return (
-          <section key={position} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+          <section key={position} className="overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-white/95 shadow-[0_14px_32px_rgba(15,23,42,0.07)] dark:border-slate-700/80 dark:bg-slate-800/95">
+            <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700">
               <h2 className="font-semibold text-slate-900 dark:text-white">{position}</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{total} total votes</p>
+              <p className="mt-0.5 text-xs text-slate-400">{total} total votes</p>
             </div>
 
-            {/* Winner */}
             {winner && (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800">
+              <div className="flex flex-col gap-4 border-b border-emerald-100 bg-emerald-50/80 px-5 py-4 dark:border-emerald-900/40 dark:bg-emerald-900/20 sm:flex-row sm:items-center">
                 <div className="relative">
                   <Avatar src={winner.profile.avatar_url} name={winner.profile.full_name} size="lg" />
                   <Trophy size={14} className="absolute -bottom-1 -right-1 text-amber-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-violet-600 dark:text-violet-300 font-medium uppercase tracking-wide">Winner</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Winner</p>
                   <p className="font-bold text-slate-900 dark:text-white">{winner.profile.full_name}</p>
-                  <p className="text-sm text-slate-500">{winner.votes_count} votes ({total ? Math.round(winner.votes_count / total * 100) : 0}%)</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{winner.votes_count} votes ({total ? Math.round(winner.votes_count / total * 100) : 0}%)</p>
                 </div>
               </div>
             )}
 
-            {/* Chart */}
             <div className="px-5 py-4">
-              <ResponsiveContainer width="100%" height={160}>
+              <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 11 }} />
@@ -113,22 +120,21 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
               </ResponsiveContainer>
             </div>
 
-            {/* Full ranking */}
             <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {group.map((c, i) => (
                 <div key={c.id} className="flex items-center gap-3 px-5 py-3">
                   <span className="w-5 text-sm font-bold text-slate-400">#{i + 1}</span>
                   <Avatar src={c.profile.avatar_url} name={c.profile.full_name} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{c.profile.full_name}</p>
-                    <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-1.5 mt-1">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{c.profile.full_name}</p>
+                    <div className="mt-1 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-700">
                       <div
-                        className="bg-violet-500 h-1.5 rounded-full"
+                        className="h-1.5 rounded-full bg-emerald-500"
                         style={{ width: `${total ? (c.votes_count / total) * 100 : 0}%` }}
                       />
                     </div>
                   </div>
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 shrink-0">
+                  <span className="shrink-0 text-sm font-semibold text-slate-700 dark:text-slate-300">
                     {total ? Math.round(c.votes_count / total * 100) : 0}%
                   </span>
                 </div>
