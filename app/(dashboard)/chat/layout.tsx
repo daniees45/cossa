@@ -5,6 +5,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { usePathname, useRouter } from 'next/navigation'
 import { Hash, Plus, X, Users, ChevronRight, Lock } from 'lucide-react'
 import { Avatar } from '@/components/shared/Avatar'
+import { ChannelAvatar } from '@/components/shared/ChannelAvatar'
 import { cn } from '@/lib/utils/cn'
 import type { Channel, Profile } from '@/types/app'
 import { useChatStore } from '@/lib/stores/chatStore'
@@ -277,7 +278,15 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 )}
               >
-                <Hash size={15} className="shrink-0" />
+                <ChannelAvatar
+                  name={ch.name}
+                  avatar_url={ch.avatar_url}
+                  emoji_icon={ch.emoji_icon}
+                  color_hex={ch.color_hex ?? '#7c3aed'}
+                  type={ch.type}
+                  size="sm"
+                  className="shrink-0"
+                />
                 <span className="truncate flex-1">{ch.name}</span>
                 {ch.type === 'private' && (
                   <Lock size={12} className="text-amber-500 shrink-0" />
@@ -395,8 +404,15 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setJoinPreview(null)} />
           <div className="relative z-10 w-full max-w-sm mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="px-6 pt-6 pb-4">
-              <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mb-4">
-                <span className="text-violet-600 font-bold text-xl">#</span>
+              <div className="mb-4">
+                <ChannelAvatar
+                  name={joinPreview.name}
+                  avatar_url={joinPreview.avatar_url}
+                  emoji_icon={joinPreview.emoji_icon}
+                  color_hex={joinPreview.color_hex ?? '#7c3aed'}
+                  type={joinPreview.type}
+                  size="lg"
+                />
               </div>
               <h2 id="join-dialog-title" className="text-base font-semibold text-slate-900 dark:text-white mb-1">
                 #{joinPreview.name}

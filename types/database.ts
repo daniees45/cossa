@@ -394,6 +394,9 @@ export interface Database {
           id: string
           name: string
           description: string | null
+          avatar_url: string | null
+          emoji_icon: string | null
+          color_hex: string | null
           type: 'public' | 'private' | 'announcement'
           private_join_mode: 'approval' | 'code'
           private_entry_code: string | null
@@ -404,6 +407,9 @@ export interface Database {
           id?: string
           name: string
           description?: string | null
+          avatar_url?: string | null
+          emoji_icon?: string | null
+          color_hex?: string | null
           type?: 'public' | 'private' | 'announcement'
           private_join_mode?: 'approval' | 'code'
           private_entry_code?: string | null
@@ -413,6 +419,9 @@ export interface Database {
         Update: {
           name?: string
           description?: string | null
+          avatar_url?: string | null
+          emoji_icon?: string | null
+          color_hex?: string | null
           type?: 'public' | 'private' | 'announcement'
           private_join_mode?: 'approval' | 'code'
           private_entry_code?: string | null
@@ -725,6 +734,9 @@ export interface Database {
           p_channel_id: string
           p_name?: string | null
           p_description?: string | null
+          p_avatar_url?: string | null
+          p_emoji_icon?: string | null
+          p_color_hex?: string | null
         }
         Returns: { ok: boolean; error?: string }
       }

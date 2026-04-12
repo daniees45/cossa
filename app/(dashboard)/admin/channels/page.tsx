@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Plus, Trash2, Loader2, Hash, Lock, Megaphone, Pencil } from 'lucide-react'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { formatDate } from '@/lib/utils/formatDate'
+import { ChannelAvatar } from '@/components/shared/ChannelAvatar'
 import type { Database } from '@/types/database'
 
 type ChannelType = 'public' | 'private' | 'announcement'
@@ -380,9 +381,14 @@ export default function AdminChannelsPage() {
                 className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${TYPE_COLORS[type]}`}>
-                    {TYPE_ICONS[type]}
-                  </div>
+                  <ChannelAvatar
+                    name={ch.name}
+                    avatar_url={ch.avatar_url}
+                    emoji_icon={ch.emoji_icon}
+                    color_hex={ch.color_hex ?? '#7c3aed'}
+                    type={ch.type as ChannelType}
+                    size="sm"
+                  />
                   <div className="min-w-0">
                     <p className="font-medium text-slate-900 dark:text-white truncate">#{ch.name}</p>
                     {ch.description && (

@@ -6,6 +6,8 @@ import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
 import { EnhancedAvatar } from '@/components/shared/EnhancedAvatar'
 import { UserProfileModal } from '@/components/shared/UserProfileModal'
+import { ChannelAvatar } from '@/components/shared/ChannelAvatar'
+import { ChannelAvatarEditor } from '@/components/shared/ChannelAvatarEditor'
 import {
   Send, ArrowLeft, Paperclip, Smile, Pencil, Trash2, X, Copy, ChevronDown, MessageCircle, Users, Settings, Bell, BellOff, LogOut,
 } from 'lucide-react'
@@ -86,6 +88,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const [members, setMembers] = useState<ChannelMemberInfo[]>([])
   const [channelNameDraft, setChannelNameDraft] = useState('')
   const [channelDescriptionDraft, setChannelDescriptionDraft] = useState('')
+  const [channelAvatarDraft, setChannelAvatarDraft] = useState<string | null>(null)
+  const [channelEmojiDraft, setChannelEmojiDraft] = useState<string | null>(null)
+  const [channelColorDraft, setChannelColorDraft] = useState('#7c3aed')
   const [savingChannelDetails, setSavingChannelDetails] = useState(false)
   const [managingMemberId, setManagingMemberId] = useState<string | null>(null)
   const [reviewingJoinRequestId, setReviewingJoinRequestId] = useState<string | null>(null)
@@ -249,7 +254,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           setMessages(msgs)
           setHasMore(data.length === 50)
           loadReactions(msgs.map((m) => m.id))
-          markChannelSeen()
+          markChannelSeen(msgs.map((m) => m.id))
         }
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       })
@@ -264,8 +269,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
         )
         if (msg.sender_id !== user?.id) {
-          const supabase = createClient()
-          supabase.rpc('mark_message_viewed', { p_message_id: msg.id })
+          markChannelSeen([msg.id])
         }
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
       })
@@ -286,7 +290,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                 : [...prev, msg as unknown as MessageWithSender]
             )
             if ((msg as { sender_id?: string }).sender_id !== user?.id) {
-              supabase.rpc('mark_message_viewed', { p_message_id: (msg as { id: string }).id })
+              markChannelSeen([(msg as { id: string }).id])
             }
             setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
@@ -379,7 +383,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     setMessages((prev) => [...older, ...prev])
     setHasMore(data.length === 50)
     loadReactions(older.map((m) => m.id))
-    markChannelSeen()
+    markChannelSeen(older.map((m) => m.id))
     requestAnimationFrame(() => {
       if (container) container.scrollTop = container.scrollHeight - prevHeight
     })
@@ -458,10 +462,30 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     setEditText(msg.content)
   }
 
-  async function markChannelSeen() {
+  async function markChannelSeen(messageIds?: string[]) {
     if (!user) return
     const supabase = createClient()
-    await supabase.rpc('mark_channel_messages_viewed', { p_channel_id: channelId })
+    const { error } = await supabase.rpc('mark_channel_messages_viewed', { p_channel_id: channelId })
+    if (!error) return
+
+    const missingRpc =
+      error.code === 'PGRST202' ||
+      /could not find the function|not found/i.test(error.message ?? '')
+    if (!missingRpc) {
+      console.error('Failed to mark channel messages viewed:', error)
+      return
+    }
+
+    const ids = (messageIds ?? messages.map((m) => m.id)).filter(Boolean)
+    if (!ids.length) return
+    const uniqueIds = Array.from(new Set(ids))
+    const payload = uniqueIds.map((id) => ({ message_id: id, viewer_id: user.id }))
+    const { error: fallbackError } = await (supabase
+      .from('message_views' as never)
+      .upsert(payload as never, { onConflict: 'message_id,viewer_id', ignoreDuplicates: true }))
+    if (fallbackError) {
+      console.error('Fallback mark seen failed:', fallbackError)
+    }
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -555,6 +579,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       p_channel_id: channelId,
       p_name: channelNameDraft,
       p_description: channelDescriptionDraft,
+      p_avatar_url: channelAvatarDraft,
+      p_emoji_icon: channelEmojiDraft,
+      p_color_hex: channelColorDraft,
     })
     setSavingChannelDetails(false)
     if (error) {
@@ -676,9 +703,14 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         <Link href="/chat" className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
           <ArrowLeft size={18} className="text-slate-600 dark:text-slate-300" />
         </Link>
-        <div className="w-8 h-8 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center shrink-0">
-          <span className="text-violet-600 font-bold text-xs">#</span>
-        </div>
+        <ChannelAvatar
+          name={channel?.name ?? 'channel'}
+          avatar_url={channel?.avatar_url}
+          emoji_icon={channel?.emoji_icon}
+          color_hex={channel?.color_hex ?? '#7c3aed'}
+          type={channel?.type}
+          size="sm"
+        />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-900 dark:text-white text-sm">{channel?.name}</p>
           <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -693,6 +725,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
             e.stopPropagation()
             setChannelNameDraft(channel?.name ?? '')
             setChannelDescriptionDraft(channel?.description ?? '')
+            setChannelAvatarDraft(channel?.avatar_url ?? null)
+            setChannelEmojiDraft(channel?.emoji_icon ?? null)
+            setChannelColorDraft(channel?.color_hex ?? '#7c3aed')
             setShowSettings(true)
             loadMembers()
           }}
@@ -721,8 +756,15 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
             {/* Channel info */}
             <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mb-3">
-                <span className="text-violet-600 font-bold text-lg">#</span>
+              <div className="mb-3">
+                <ChannelAvatar
+                  name={channelNameDraft || channel?.name || 'channel'}
+                  avatar_url={channelAvatarDraft}
+                  emoji_icon={channelEmojiDraft}
+                  color_hex={channelColorDraft}
+                  type={channel?.type}
+                  size="lg"
+                />
               </div>
               {isChannelAdmin ? (
                 <div className="space-y-2">
@@ -743,6 +785,19 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                       className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
                     />
                   </div>
+                  <ChannelAvatarEditor
+                    channelId={channelId}
+                    channelName={channelNameDraft || channel?.name || 'channel'}
+                    currentAvatar={channelAvatarDraft}
+                    currentEmoji={channelEmojiDraft}
+                    currentColor={channelColorDraft}
+                    isAdmin={isChannelAdmin}
+                    onUpdate={async ({ avatar_url, emoji_icon, color_hex }) => {
+                      if (avatar_url !== undefined) setChannelAvatarDraft(avatar_url)
+                      if (emoji_icon !== undefined) setChannelEmojiDraft(emoji_icon)
+                      if (color_hex !== undefined) setChannelColorDraft(color_hex)
+                    }}
+                  />
                   <button
                     onClick={saveChannelDetails}
                     disabled={savingChannelDetails}
