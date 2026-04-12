@@ -52,7 +52,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-slate-200 bg-white px-3 py-6 dark:border-slate-800 dark:bg-slate-900 md:flex">
+    <aside className="sticky top-0 hidden h-dvh min-h-0 w-60 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white px-3 py-6 dark:border-slate-800 dark:bg-slate-900 md:flex">
       {/* Logo */}
       <div className="flex items-center gap-3 px-3 mb-8">
         <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
@@ -65,7 +65,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto pr-1">
+      <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1">
         {NAV.map(({ label, href, icon: Icon }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
@@ -93,7 +93,7 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom: profile + logout */}
-      <div className="mt-4 space-y-0.5 border-t border-slate-100 pt-4 dark:border-slate-800">
+      <div className="mt-3 shrink-0 space-y-0.5 border-t border-slate-100 pt-3 dark:border-slate-800">
         {user && ['admin', 'super_admin'].includes(user.role) && (
           <Link
             href="/admin"
