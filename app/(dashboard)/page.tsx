@@ -135,10 +135,6 @@ export default function FeedPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-600/80 dark:text-cyan-300/80">Campus Feed</p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Stories, wins, memes, and moments.</h1>
-                <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                  A cleaner stream for COSSA conversations with faster posting, softer hierarchy, and more room for visuals.
-                </p>
               </div>
 
               <button
