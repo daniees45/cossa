@@ -118,7 +118,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -12, scale: 0.97 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+          className="overflow-hidden rounded-[1.7rem] border border-slate-200/80 bg-white/96 shadow-[0_14px_38px_rgba(15,23,42,0.06)] backdrop-blur dark:border-slate-700/70 dark:bg-slate-800/96"
         >
       {/* Pinned banner */}
       {post.pinned && (
@@ -141,7 +141,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
         </div>
       )}
 
-      <div className="p-4">
+      <div className="p-4 sm:p-5">
         {/* Header */}
         <div className="mb-3 flex items-start justify-between gap-2">
           <Link href={`/profile/${post.author.username}`} className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -180,7 +180,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
         {/* Content */}
         <div
-          className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800 dark:text-slate-200"
+          className="mb-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800 dark:text-slate-200"
           dangerouslySetInnerHTML={{ __html: post.content }}
         />
 
@@ -202,12 +202,12 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
         )}
 
         {/* Actions */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-3 dark:border-slate-700">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 pt-3 dark:border-slate-700">
           <button
             onClick={toggleLike}
             className={cn(
-              'flex items-center gap-1.5 text-sm transition',
-              liked ? 'text-red-500' : 'text-slate-500 hover:text-red-500'
+              'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition',
+              liked ? 'bg-red-50 text-red-500 dark:bg-red-950/40' : 'text-slate-500 hover:bg-slate-100 hover:text-red-500 dark:hover:bg-slate-700/70'
             )}
           >
             <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
@@ -216,7 +216,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
           <button
             onClick={() => setShowComments(!showComments)}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-violet-600 transition"
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
           >
             <MessageCircle size={16} />
             {commentsCount > 0 && <span>{commentsCount}</span>}
@@ -224,7 +224,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-violet-600 transition"
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
           >
             <Share2 size={16} />
           </button>
@@ -232,8 +232,8 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
           <button
             onClick={toggleBookmark}
             className={cn(
-              'flex items-center gap-1.5 text-sm transition ml-auto',
-              bookmarked ? 'text-violet-600' : 'text-slate-500 hover:text-violet-600'
+              'ml-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition',
+              bookmarked ? 'bg-violet-50 text-violet-600 dark:bg-violet-950/40' : 'text-slate-500 hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-700/70'
             )}
           >
             <Bookmark size={16} fill={bookmarked ? 'currentColor' : 'none'} />

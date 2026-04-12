@@ -38,14 +38,17 @@ export function TrendingTopics() {
   if (tags.length === 0) return null
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-4">
+    <div className="rounded-[1.6rem] border border-slate-200/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] dark:border-slate-700/70 dark:bg-[linear-gradient(145deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92))]">
       <div className="flex items-center gap-2 mb-3">
         <TrendingUp size={15} className="text-violet-500" />
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Trending</h3>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-500/80">Momentum</p>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Trending</h3>
+        </div>
       </div>
       <ul className="space-y-1.5">
         {tags.map(({ tag, count }, i) => (
-          <li key={tag} className="flex items-center justify-between group">
+          <li key={tag} className="group flex items-center justify-between rounded-2xl border border-slate-100/80 bg-white/75 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/45">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-[11px] text-slate-400 w-4 tabular-nums shrink-0">{i + 1}</span>
               <span className="flex items-center gap-0.5 text-sm font-medium text-violet-600 dark:text-violet-400 truncate">

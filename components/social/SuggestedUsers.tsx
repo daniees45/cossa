@@ -58,8 +58,9 @@ export function SuggestedUsers() {
   if (!user || (!loading && suggestions.length === 0)) return null
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4">
-      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">Who to follow</h3>
+    <div className="rounded-[1.6rem] border border-slate-200/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] dark:border-slate-700/70 dark:bg-[linear-gradient(145deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92))]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-600/80 dark:text-cyan-300/80">People</p>
+      <h3 className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">Who to follow</h3>
 
       {loading ? (
         <div className="flex justify-center py-4">
@@ -68,7 +69,7 @@ export function SuggestedUsers() {
       ) : (
         <ul className="space-y-3">
           {suggestions.map((s) => (
-            <li key={s.id} className="flex items-center gap-3">
+            <li key={s.id} className="flex items-center gap-3 rounded-2xl border border-slate-100/80 bg-white/75 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900/45">
               <Link href={`/profile/${s.username}`} className="shrink-0">
                 <Avatar src={s.avatar_url} name={s.full_name} size="sm" />
               </Link>

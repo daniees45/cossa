@@ -126,17 +126,67 @@ export default function FeedPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-      <div className="flex flex-col gap-4 md:gap-6 items-start">
+    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         {/* Main feed column */}
-        <div className="flex-1 min-w-0 space-y-4" ref={feedTopRef}>
+        <div className="min-w-0 space-y-5" ref={feedTopRef}>
+
+          <section className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.98),rgba(241,245,249,0.88))] p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-700/70 dark:bg-[linear-gradient(145deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92))] sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-600/80 dark:text-cyan-300/80">Campus Feed</p>
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Stories, wins, memes, and moments.</h1>
+                <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  A cleaner stream for COSSA conversations with faster posting, softer hierarchy, and more room for visuals.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-200/80 bg-white/80 p-2 text-center dark:border-slate-700 dark:bg-slate-900/60">
+                <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
+                  <p className="text-lg font-semibold text-slate-900 dark:text-white">{feed.length}</p>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Loaded</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
+                  <p className="text-lg font-semibold text-slate-900 dark:text-white">{broadcasts.length}</p>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Broadcasts</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
+                  <p className="text-lg font-semibold text-slate-900 dark:text-white">{newCount}</p>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">New</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex gap-1.5 overflow-x-auto rounded-2xl bg-slate-950/5 p-1.5 dark:bg-white/5">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setMode(tab.id)}
+                  className={cn(
+                    'flex min-w-fit flex-1 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-sm font-medium transition whitespace-nowrap',
+                    mode === tab.id
+                      ? 'bg-white text-slate-950 shadow-[0_8px_20px_rgba(15,23,42,0.12)] dark:bg-slate-800 dark:text-white'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100',
+                  )}
+                >
+                  {tab.icon}
+                  {tab.label}
+                  {tab.id === 'saved' && mode !== 'saved' && (
+                    <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">beta</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
 
           {broadcasts.length > 0 && (
             <section className="space-y-2">
               {broadcasts.map((b) => (
-                <div key={b.id} className="rounded-xl border border-cyan-200/60 dark:border-cyan-900/40 bg-cyan-50 dark:bg-cyan-900/20 px-4 py-3">
+                <div key={b.id} className="rounded-[1.4rem] border border-cyan-200/60 bg-[linear-gradient(145deg,rgba(236,254,255,0.95),rgba(207,250,254,0.82))] px-4 py-3 shadow-[0_12px_30px_rgba(8,145,178,0.08)] dark:border-cyan-900/40 dark:bg-[linear-gradient(145deg,rgba(8,47,73,0.55),rgba(17,94,89,0.32))]">
                   <div className="flex items-start gap-2">
-                    <Megaphone size={14} className="text-cyan-700 dark:text-cyan-300 mt-0.5 shrink-0" />
+                    <div className="mt-0.5 rounded-full bg-white/80 p-1.5 shadow-sm dark:bg-slate-900/60">
+                      <Megaphone size={14} className="text-cyan-700 dark:text-cyan-300 shrink-0" />
+                    </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">{b.title}</p>
                       <p className="text-xs text-cyan-800/90 dark:text-cyan-100/90 mt-0.5">{b.body}</p>
@@ -152,33 +202,11 @@ export default function FeedPage() {
             </section>
           )}
 
-          {/* Feed tabs */}
-          <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setMode(tab.id)}
-                className={cn(
-                  'min-w-fit flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition whitespace-nowrap',
-                  mode === tab.id
-                    ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200',
-                )}
-              >
-                {tab.icon}
-                {tab.label}
-                {tab.id === 'saved' && mode !== 'saved' && (
-                  <span className="ml-0.5 text-xs text-violet-400">(β)</span>
-                )}
-              </button>
-            ))}
-          </div>
-
           {/* New posts banner */}
           {newCount > 0 && (
             <button
               onClick={loadNewPosts}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium transition shadow-lg animate-bounce-subtle"
+              className="flex w-full items-center justify-center gap-2 rounded-[1.3rem] bg-[linear-gradient(135deg,#0f172a,#7c3aed)] px-4 py-3 text-sm font-medium text-white shadow-[0_16px_34px_rgba(109,40,217,0.28)] transition hover:translate-y-[-1px] hover:shadow-[0_20px_42px_rgba(109,40,217,0.32)]"
             >
               <ArrowUp size={15} />
               {newCount} new post{newCount !== 1 ? 's' : ''} — tap to load
@@ -187,12 +215,14 @@ export default function FeedPage() {
 
           {/* Post editor (only on For You + Following tabs) */}
           {user && mode !== 'saved' && (
-            <PostEditor
-              onPosted={(post) => {
-                setLocalPosts((prev) => [post, ...prev])
-                setNewCount(0)
-              }}
-            />
+            <div className="rounded-[2rem] border border-slate-200/80 bg-white/92 p-3 shadow-[0_16px_40px_rgba(15,23,42,0.08)] dark:border-slate-700/70 dark:bg-slate-900/92 sm:p-4">
+              <PostEditor
+                onPosted={(post) => {
+                  setLocalPosts((prev) => [post, ...prev])
+                  setNewCount(0)
+                }}
+              />
+            </div>
           )}
 
           {/* Feed */}
@@ -205,7 +235,7 @@ export default function FeedPage() {
               description={EMPTY_STATE[mode].description}
             />
           ) : (
-            <>
+            <div className="space-y-4">
               {feed.map((post) => (
                 <PostCard
                   key={post.id}
@@ -216,12 +246,12 @@ export default function FeedPage() {
               <div ref={loaderRef} className="flex justify-center py-4">
                 {isFetchingNextPage && <Loader2 size={20} className="animate-spin text-violet-600" />}
               </div>
-            </>
+            </div>
           )}
         </div>
 
         {/* Right sidebar */}
-        <aside className="hidden lg:flex flex-col gap-4 w-72 shrink-0 sticky top-6">
+        <aside className="hidden xl:flex w-72 shrink-0 flex-col gap-4 sticky top-6">
           <SuggestedUsers />
           <TrendingTopics />
         </aside>
