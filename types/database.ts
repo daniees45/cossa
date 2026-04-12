@@ -702,6 +702,40 @@ export interface Database {
         Args: { p_identifier: string }
         Returns: string | null
       }
+      get_feed_with_user_status: {
+        Args: {
+          p_mode?: string
+          p_page?: number
+          p_page_size?: number
+        }
+        Returns: Array<{
+          id: string
+          author_id: string
+          content: string
+          media_urls: string[] | null
+          type: string
+          likes_count: number
+          comments_count: number
+          pinned: boolean
+          created_at: string
+          author: Json
+          liked_by_me: boolean
+          bookmarked_by_me: boolean
+        }>
+      }
+      build_post_comment_node: {
+        Args: {
+          p_comment_id: string
+        }
+        Returns: Json
+      }
+      get_post_comments_tree: {
+        Args: {
+          p_post_id: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
       get_voter_roll_count: {
         Args: { p_election_id: string }
         Returns: number

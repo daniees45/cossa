@@ -344,16 +344,16 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
     setLoading(true)
     const supabase = createClient()
 
-    supabase
-      .from('post_comments')
-      .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true })
-      .limit(50)
-      .then(({ data }) => {
-        if (data) setComments(buildTree(data as unknown as CommentRow[]))
-        setLoading(false)
+    async function loadComments() {
+      const { data } = await supabase.rpc('get_post_comments_tree', {
+        p_post_id: postId,
+        p_limit: 50,
       })
+      setComments((data ?? []) as unknown as CommentRow[])
+      setLoading(false)
+    }
+
+    void loadComments()
 
     // Live subscription — new comments from other users appear instantly
     const realtimeChannel = supabase
@@ -363,25 +363,7 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
         { event: 'INSERT', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
         async (payload) => {
           const newId = (payload.new as { id: string }).id
-          const { data: row } = await supabase
-            .from('post_comments')
-            .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
-            .eq('id', newId)
-            .single()
-          if (!row) return
-          const newComment = { ...(row as unknown as CommentRow), replies: [] }
-          setComments((prev) => {
-            if (newComment.parent_id) {
-              if (prev.some((c) => c.replies?.some((r) => r.id === newId))) return prev
-              return prev.map((c) =>
-                c.id === newComment.parent_id
-                  ? { ...c, replies: [...(c.replies ?? []), newComment] }
-                  : c
-              )
-            }
-            if (prev.some((c) => c.id === newId)) return prev
-            return [...prev, newComment]
-          })
+          await loadComments()
           if (!submittedRef.current.has(newId)) {
             onCommentAddedRef.current?.()
           }
@@ -392,20 +374,6 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
 
     return () => { supabase.removeChannel(realtimeChannel) }
   }, [postId])
-
-  function buildTree(flat: CommentRow[]): CommentRow[] {
-    const map = new Map<string, CommentRow>()
-    const roots: CommentRow[] = []
-    flat.forEach((c) => { map.set(c.id, { ...c, replies: [] }) })
-    map.forEach((c) => {
-      if (c.parent_id && map.has(c.parent_id)) {
-        map.get(c.parent_id)!.replies!.push(c)
-      } else {
-        roots.push(c)
-      }
-    })
-    return roots
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -422,17 +390,8 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
       .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
       .single()
     if (!error && data) {
-      const newComment = { ...(data as unknown as CommentRow), replies: [] }
+      const newComment = data as unknown as CommentRow
       submittedRef.current.add(newComment.id)
-      if (replyingTo) {
-        setComments((prev) => prev.map((c) =>
-          c.id === replyingTo.id
-            ? { ...c, replies: [...(c.replies ?? []), newComment] }
-            : c
-        ))
-      } else {
-        setComments((c) => [...c, newComment])
-      }
       setText('')
       setReplyingTo(null)
       onCommentAdded?.()
