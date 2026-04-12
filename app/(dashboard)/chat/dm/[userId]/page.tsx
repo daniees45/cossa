@@ -622,9 +622,9 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const isMutedDm = mutedDms.includes(userId)
 
   return (
-    <div className="flex flex-col h-full" onClick={() => setPickerFor(null)}>
+    <div className="flex min-h-0 h-full flex-col" onClick={() => setPickerFor(null)}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+      <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur">
         <Link href="/chat" className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
           <ArrowLeft size={18} />
         </Link>
@@ -633,7 +633,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
             <Avatar src={other.avatar_url} name={other.full_name} size="sm" />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <p className="font-semibold text-slate-900 dark:text-white text-sm">{other.full_name}</p>
+                <p className="font-semibold text-slate-900 dark:text-white text-sm truncate">{other.full_name}</p>
                 {otherOnline && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Online" />}
               </div>
               <p className="text-xs text-slate-400">{otherOnline ? 'Online' : `@${other.username}`}</p>
@@ -734,7 +734,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-1">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.05),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.12),transparent_45%)]">
         {hasMore && (
           <div className="flex justify-center pb-2">
             <button
@@ -799,7 +799,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 <div className="w-7 shrink-0" />
               )}
 
-              <div className={cn('max-w-[85%] sm:max-w-[70%]', isOwn ? 'items-end flex flex-col' : '')}>
+              <div className={cn('max-w-[88%] sm:max-w-[72%] lg:max-w-[66%]', isOwn ? 'items-end flex flex-col' : '')}>
                 {!grouped && (
                   <p className="text-xs text-slate-400 mb-1 px-1">
                     {isOwn ? 'You' : msg.sender.full_name}
@@ -891,14 +891,14 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
               {/* Hover actions: emoji picker + edit/delete */}
               <div className={cn(
-                'flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mb-1 shrink-0',
+                'flex items-center gap-1 rounded-xl bg-white/80 dark:bg-slate-800/80 px-1 py-0.5 opacity-100 md:bg-transparent md:p-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity mb-1 shrink-0 backdrop-blur-sm md:backdrop-blur-0',
                 isOwn && 'order-first flex-row-reverse',
               )}>
                 {/* Emoji picker trigger */}
                 <div className="relative">
                   <button
                     onClick={(e) => { e.stopPropagation(); setPickerFor(pickerFor === msg.id ? null : msg.id) }}
-                    className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-300"
                   >
                     <Smile size={14} />
                   </button>
@@ -927,7 +927,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                     {!msg.read_at && (
                       <button
                         onClick={(e) => { e.stopPropagation(); startEdit(msg) }}
-                        className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-300"
                         title="Edit message"
                       >
                         <Pencil size={13} />
@@ -936,7 +936,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                     {/* Delete: always allowed for sender */}
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteMessage(msg) }}
-                      className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500"
+                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-500 hover:text-red-500 dark:text-slate-300"
                       title={msg.read_at ? 'Remove from your view' : 'Delete message'}
                     >
                       <Trash2 size={13} />
@@ -946,7 +946,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 {/* Copy */}
                 <button
                   onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(content) }}
-                  className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-300"
                   title="Copy message"
                 >
                   <Copy size={13} />
@@ -1015,7 +1015,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       <form
         ref={formRef}
         onSubmit={sendMessage}
-        className="flex items-end gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
+        className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur"
       >
         <input
           ref={fileInputRef}
@@ -1045,7 +1045,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         <button
           type="submit"
           disabled={(!text.trim() && !mediaFile) || uploading || sending}
-          className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
+          className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
         >
           {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
         </button>

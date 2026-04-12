@@ -734,13 +734,13 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="flex min-h-0 h-full flex-col"
       onClick={() => setPickerFor(null)}
       style={{ backgroundColor: panelBg }}
     >
       {/* Header */}
       <div
-        className="flex items-center gap-3 px-4 py-3 border-b dark:border-slate-800 shrink-0"
+        className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b dark:border-slate-800 shrink-0 backdrop-blur"
         style={{
           background: channel?.banner_url
             ? `linear-gradient(to right, ${hexToRgba(themeColor, 0.92)}, ${hexToRgba(themeColor, 0.68)}), url(${channel.banner_url}) center/cover`
@@ -760,7 +760,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           size="sm"
         />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-slate-900 dark:text-white text-sm">{channel?.name}</p>
+          <p className="font-semibold text-slate-900 dark:text-white text-sm truncate">{channel?.name}</p>
           <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-200">
             {channel?.description && <span className="truncate">{channel.description}</span>}
             {memberCount !== undefined && (
@@ -978,7 +978,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-1"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1"
         style={{ backgroundColor: channel?.banner_url ? hexToRgba(themeColor, 0.04) : undefined }}
       >
         {hasMore && (
@@ -1042,7 +1042,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                 <div className="w-7 shrink-0" />
               )}
 
-              <div className={cn('max-w-[85%] sm:max-w-[70%]', isOwn && 'items-end flex flex-col')}>
+              <div className={cn('max-w-[88%] sm:max-w-[72%] lg:max-w-[66%]', isOwn && 'items-end flex flex-col')}>
                 {!grouped && (
                   <p className="text-xs text-slate-400 mb-1 px-1">
                     {isOwn ? 'You' : msg.sender.full_name}
@@ -1132,14 +1132,14 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
               {/* Hover actions */}
               <div className={cn(
-                'flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mb-1 shrink-0',
+                'flex items-center gap-1 rounded-xl bg-white/80 dark:bg-slate-800/80 px-1 py-0.5 opacity-100 md:bg-transparent md:p-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity mb-1 shrink-0 backdrop-blur-sm md:backdrop-blur-0',
                 isOwn && 'order-first flex-row-reverse',
               )}>
                 {/* Emoji picker */}
                 <div className="relative">
                   <button
                     onClick={(e) => { e.stopPropagation(); setPickerFor(pickerFor === msg.id ? null : msg.id) }}
-                    className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-300"
                   >
                     <Smile size={14} />
                   </button>
@@ -1166,13 +1166,13 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                   <>
                     <button
                       onClick={(e) => { e.stopPropagation(); void startEdit(msg) }}
-                      className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-300"
                     >
                       <Pencil size={13} />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); deleteMessage(msg.id) }}
-                      className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500"
+                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-500 hover:text-red-500 dark:text-slate-300"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -1181,7 +1181,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                 {/* Copy */}
                 <button
                   onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(msg.content) }}
-                  className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-300"
                   title="Copy message"
                 >
                   <Copy size={13} />
@@ -1252,7 +1252,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       <form
         ref={formRef}
         onSubmit={sendMessage}
-        className="flex items-end gap-2 px-3 sm:px-4 py-3 border-t dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
+        className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-3 border-t dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur"
         style={{ borderColor: panelBorder, backgroundColor: hexToRgba(themeColor, 0.05) }}
       >
         <input
@@ -1284,7 +1284,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         <button
           type="submit"
           disabled={(!text.trim() && !mediaFile) || sending || uploading}
-          className="w-10 h-10 rounded-xl disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
+          className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
           style={{ backgroundColor: themeColor }}
         >
           {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}

@@ -244,19 +244,20 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 bg-slate-50 dark:bg-slate-950">
       {/* Channel list sidebar */}
       <div className={cn(
-        'w-full md:w-64 md:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 min-h-0',
+        'w-full md:w-[19rem] md:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/95 flex flex-col shrink-0 min-h-0',
         pathname !== '/chat' && 'hidden md:flex'
       )}>
-        <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-violet-50 to-cyan-50 dark:from-slate-900 dark:to-slate-900">
           <h2 className="font-semibold text-slate-900 dark:text-white text-sm">Messages</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Channels and direct chats</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-2 min-h-0">
+        <div className="flex-1 overflow-y-auto py-3 min-h-0">
           {/* Channels */}
-          <div className="px-3 mb-2">
+          <div className="px-3 mb-3">
             <div className="mb-1 px-2 flex items-center justify-between">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Channels</p>
               <button
@@ -272,9 +273,9 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                 key={ch.id}
                 onClick={() => handleChannelClick(ch)}
                 className={cn(
-                  'w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-sm transition text-left',
+                  'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border border-transparent',
                   pathname === `/chat/${ch.id}`
-                    ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                    ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 )}
               >
@@ -304,7 +305,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* DMs */}
-          <div className="px-3 mt-4">
+          <div className="px-3 mt-5">
             <div className="flex items-center justify-between px-2 mb-1">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Direct Messages</p>
               <button
@@ -365,9 +366,9 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                   key={u.id}
                   onClick={() => navigateToDm(u.id)}
                   className={cn(
-                    'w-full flex items-center gap-2.5 px-2 py-2 rounded-xl text-sm transition text-left',
+                      'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border border-transparent',
                     isActive
-                      ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                        ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800'
                       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                   )}
                 >
@@ -387,7 +388,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
 
       {/* Main chat area */}
       <div className={cn(
-        'flex-1 min-w-0',
+        'flex-1 min-w-0 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.08),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.07),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.14),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.12),transparent_40%)]',
         pathname === '/chat' && 'hidden md:flex'
       )}>
         {children}
@@ -396,13 +397,13 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
       {/* Channel join preview modal */}
       {joinPreview && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4"
           aria-modal="true"
           role="dialog"
           aria-labelledby="join-dialog-title"
         >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setJoinPreview(null)} />
-          <div className="relative z-10 w-full max-w-sm mx-3 sm:mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[calc(100dvh-2rem)] overflow-y-auto">
+          <div className="relative z-10 w-full max-w-sm bg-white dark:bg-slate-900 rounded-[1.75rem] sm:rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="px-6 pt-6 pb-4">
               <div className="mb-4">
                 <ChannelAvatar
@@ -474,11 +475,11 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
 
       {/* Channel creation request modal */}
       {showCreateRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" aria-modal="true" role="dialog" aria-labelledby="create-channel-request-title">
+        <div className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4" aria-modal="true" role="dialog" aria-labelledby="create-channel-request-title">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowCreateRequest(false)} />
           <form
             onSubmit={submitChannelRequest}
-            className="relative z-10 w-full max-w-md mx-3 sm:mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[calc(100dvh-2rem)] overflow-y-auto"
+            className="relative z-10 w-full max-w-md bg-white dark:bg-slate-900 rounded-[1.75rem] sm:rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[calc(100dvh-2rem)] overflow-y-auto"
           >
             <div className="px-6 pt-6 pb-4 space-y-3">
               <h2 id="create-channel-request-title" className="text-base font-semibold text-slate-900 dark:text-white">
