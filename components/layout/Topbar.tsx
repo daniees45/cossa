@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { Bell, Search, Sun, Moon } from 'lucide-react'
+import { Bell, Search, Sun, Moon, LogOut, User, Settings } from 'lucide-react'
 import { useTheme } from '@/lib/context/ThemeProvider'
 import { SearchModal } from '@/components/shared/SearchModal'
 import { useNotificationStore } from '@/lib/stores/notificationStore'
@@ -28,7 +28,9 @@ export function Topbar() {
   const { user } = useUser()
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -64,6 +66,7 @@ export function Topbar() {
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -73,6 +76,7 @@ export function Topbar() {
   useEffect(() => {
     setOpen(false)
     setSearchOpen(false)
+    setUserMenuOpen(false)
   }, [pathname])
 
   async function handleMarkAllRead() {
@@ -84,6 +88,12 @@ export function Topbar() {
       .update({ read: true })
       .eq('user_id', user.id)
       .in('type', VISIBLE_NOTIFICATION_TYPES)
+  }
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
   return (
@@ -178,11 +188,52 @@ export function Topbar() {
 
         {/* Avatar */}
         {user && (
-          <Link href={`/profile/${user.username}`} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-violet-600 text-xs font-bold text-white">
-            {user.avatar_url
-              ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-              : getInitials(user.full_name)}
-          </Link>
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setUserMenuOpen((v) => !v)}
+              className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-violet-600 text-xs font-bold text-white ring-2 ring-transparent transition hover:ring-violet-300"
+              title="Account menu"
+            >
+              {user.avatar_url
+                ? <img src={user.avatar_url} alt="" className="h-full w-full object-cover" />
+                : getInitials(user.full_name)}
+            </button>
+
+            {userMenuOpen && (
+              <div className="absolute right-0 top-11 z-50 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                <div className="border-b border-slate-100 px-3 py-2.5 dark:border-slate-700">
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{user.full_name}</p>
+                  <p className="truncate text-xs text-slate-400">@{user.username}</p>
+                </div>
+
+                <div className="p-1.5">
+                  <Link
+                    href={`/profile/${user.username}`}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700"
+                  >
+                    <User size={14} />
+                    Profile
+                  </Link>
+
+                  <Link
+                    href="/profile/edit"
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700"
+                  >
+                    <Settings size={14} />
+                    Edit profile
+                  </Link>
+
+                  <button
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-red-600 transition hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <LogOut size={14} />
+                    Sign out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </header>
