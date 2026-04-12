@@ -143,7 +143,7 @@ BEGIN
 
   v_name_slug := NULL;
   IF p_name IS NOT NULL THEN
-    v_name_slug := lower(regexp_replace(trim(coalesce(p_name, '')), '[^a-z0-9-]+', '-', 'g'));
+    v_name_slug := regexp_replace(lower(trim(coalesce(p_name, ''))), '[^a-z0-9-]+', '-', 'g');
     v_name_slug := regexp_replace(v_name_slug, '(^-+|-+$)', '', 'g');
     IF v_name_slug = '' THEN
       RETURN json_build_object('ok', false, 'error', 'Channel name cannot be empty.');

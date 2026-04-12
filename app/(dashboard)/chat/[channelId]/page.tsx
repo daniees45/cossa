@@ -703,6 +703,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const panelBg = hexToRgba(themeColor, 0.06)
   const panelBorder = hexToRgba(themeColor, 0.2)
   const accentSoft = hexToRgba(themeColor, 0.18)
+  const incomingBubbleBg = hexToRgba(themeColor, 0.12)
+  const incomingBubbleBorder = hexToRgba(themeColor, 0.22)
 
   if (memberCheckLoading) {
     return (
@@ -1076,9 +1078,11 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                       'rounded-2xl text-sm inline-block',
                       isOwn
                         ? 'text-white rounded-tr-sm'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-sm',
+                        : 'text-slate-800 dark:text-slate-100 rounded-tl-sm border',
                     )}
-                    style={isOwn ? { backgroundColor: themeColor } : undefined}
+                    style={isOwn
+                      ? { backgroundColor: themeColor }
+                      : { backgroundColor: incomingBubbleBg, borderColor: incomingBubbleBorder }}
                   >
                     {msg.media_url && (
                       <div className="p-2 pb-0">
@@ -1090,7 +1094,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                             onClick={(e) => { e.stopPropagation(); window.open(msg.media_url!) }}
                           />
                         ) : (
-                          <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className={cn('flex items-center gap-1.5 text-xs underline py-1 px-1', isOwn ? 'text-violet-200' : 'text-slate-500')}>
+                          <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className={cn('flex items-center gap-1.5 text-xs underline py-1 px-1', isOwn ? 'text-violet-200' : 'text-slate-700 dark:text-slate-200')}>
                             <Paperclip size={11} /> Attachment
                           </a>
                         )}
@@ -1107,7 +1111,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                       {msg.edited_at && <span className="text-[9px] italic opacity-70">(edited)</span>}
                       <span className={cn(
                         'text-[10px] opacity-70 leading-none',
-                        isOwn ? 'text-violet-200' : 'text-slate-400',
+                        isOwn ? 'text-violet-200' : 'text-slate-500 dark:text-slate-300',
                       )}>{formatTime(msg.created_at)}</span>
                     </div>
                   </div>

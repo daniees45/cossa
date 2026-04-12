@@ -1,20 +1,11 @@
 -- ============================================================
--- COSSA — Channel profile personalization
--- Adds channel avatar image, emoji icon, theme color, and banner
+-- COSSA — Fix channel slug case normalization
+-- Prevents uppercase leading letters from being stripped during slug generation
 -- ============================================================
 
-ALTER TABLE channels
-ADD COLUMN IF NOT EXISTS avatar_url text,
-ADD COLUMN IF NOT EXISTS emoji_icon text,
-ADD COLUMN IF NOT EXISTS color_hex text DEFAULT '#7c3aed',
-ADD COLUMN IF NOT EXISTS banner_url text;
-
-UPDATE channels
-SET color_hex = '#7c3aed'
-WHERE color_hex IS NULL;
-
--- Replace existing function signature to support channel avatar and banner fields.
 DROP FUNCTION IF EXISTS update_channel_details(uuid, text, text);
+DROP FUNCTION IF EXISTS update_channel_details(uuid, text, text, text, text, text);
+DROP FUNCTION IF EXISTS update_channel_details(uuid, text, text, text, text, text, text);
 
 CREATE OR REPLACE FUNCTION update_channel_details(
   p_channel_id uuid,

@@ -74,7 +74,7 @@ BEGIN
     RETURN json_build_object('ok', false, 'error', 'Not authenticated.');
   END IF;
 
-  v_name_slug := lower(regexp_replace(trim(coalesce(p_name, '')), '[^a-z0-9-]+', '-', 'g'));
+  v_name_slug := regexp_replace(lower(trim(coalesce(p_name, ''))), '[^a-z0-9-]+', '-', 'g');
   v_name_slug := regexp_replace(v_name_slug, '(^-+|-+$)', '', 'g');
 
   IF v_name_slug = '' THEN
