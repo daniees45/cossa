@@ -308,15 +308,16 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="flex h-full min-h-0 bg-slate-50 dark:bg-slate-950">
+    <div className="flex h-full min-h-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.08),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(139,92,246,0.08),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(139,92,246,0.14),transparent_45%)]">
       {/* Channel list sidebar */}
       <div className={cn(
-        'w-full md:w-[19rem] md:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/95 flex flex-col shrink-0 min-h-0',
+        'w-full md:w-[19.5rem] md:border-r border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 flex flex-col shrink-0 min-h-0 backdrop-blur',
         pathname !== '/chat' && 'hidden md:flex'
       )}>
-        <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-violet-50 to-cyan-50 dark:from-slate-900 dark:to-slate-900">
-          <h2 className="font-semibold text-slate-900 dark:text-white text-sm">Messages</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Channels and direct chats</p>
+        <div className="border-b border-slate-100 dark:border-slate-800 bg-[linear-gradient(120deg,rgba(238,242,255,0.95),rgba(236,254,255,0.9))] px-4 py-4 dark:bg-[linear-gradient(120deg,rgba(15,23,42,0.95),rgba(30,41,59,0.9))]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-700/80 dark:text-cyan-300/80">Communication</p>
+          <h2 className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">Messages</h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Channels and direct chats</p>
         </div>
 
         <div className="flex-1 overflow-y-auto py-3 min-h-0">
@@ -326,7 +327,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Channels</p>
               <button
                 onClick={() => setShowCreateRequest(true)}
-                className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 transition"
+                className="rounded-full border border-slate-200/80 bg-white px-2.5 py-0.5 text-[10px] font-medium text-slate-500 transition hover:text-violet-600 dark:border-slate-700 dark:bg-slate-800"
                 title="Request new channel"
               >
                 Request
@@ -338,10 +339,10 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                 key={ch.id}
                 onClick={() => handleChannelClick(ch)}
                 className={cn(
-                  'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border border-transparent',
+                  'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border',
                   pathname === `/chat/${ch.id}`
-                    ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 shadow-sm'
+                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                 )}
               >
                 <ChannelAvatar
@@ -375,7 +376,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Direct Messages</p>
               <button
                 onClick={() => setShowDmSearch(true)}
-                className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-violet-500 transition"
+                className="rounded-full border border-slate-200/80 p-1 text-slate-400 transition hover:bg-slate-100 hover:text-violet-500 dark:border-slate-700 dark:hover:bg-slate-700"
                 title="Start new DM"
               >
                 <Plus size={14} />
@@ -431,10 +432,10 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                   key={u.id}
                   onClick={() => navigateToDm(u.id)}
                   className={cn(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border border-transparent',
+                      'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border',
                     isActive
-                        ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 shadow-sm'
+                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                   )}
                 >
                   <Avatar src={u.avatar_url} name={u.full_name} size="sm" />
@@ -453,7 +454,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
 
       {/* Main chat area */}
       <div className={cn(
-        'flex-1 min-w-0 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.08),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.07),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.14),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.12),transparent_40%)]',
+        'flex-1 min-w-0 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.09),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.08),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.16),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.14),transparent_40%)]',
         pathname === '/chat' && 'hidden md:flex'
       )}>
         {children}

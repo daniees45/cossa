@@ -17,11 +17,13 @@ import type { Channel, MessageWithSender, Profile } from '@/types/app'
 import type { Database } from '@/types/database'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useChatStore } from '@/lib/stores/chatStore'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { Spinner } from '@/components/shared/Spinner'
 import { MobileSlideOver } from '@/components/shared/MobileSlideOver'
 import { toast } from 'sonner'
+import { AnimatePresence, motion } from 'framer-motion'
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
 type Reaction = { emoji: string; count: number; byMe: boolean }
@@ -84,6 +86,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const qc = useQueryClient()
   const { setChannelUnread } = useChatStore()
   const { confirm } = useDialog()
+  const router = useRouter()
 
   const [messages, setMessages] = useState<MessageWithSender[]>([])
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
@@ -123,6 +126,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const [typingUsers, setTypingUsers] = useState<string[]>([])
   const [mobileActionFor, setMobileActionFor] = useState<string | null>(null)
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressOriginRef = useRef<{ x: number; y: number } | null>(null)
   const [chatStyle, setChatStyle] = useState<ChatStylePrefs>({
     fontFamily: 'default',
     fontSize: '14',
@@ -221,8 +225,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   useEffect(() => {
     const supabase = createClient()
+    const topic = `channel-members-${channelId}-${Date.now()}`
     const ch = supabase
-      .channel(`channel-members-${channelId}`)
+      .channel(topic)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'channel_members', filter: `channel_id=eq.${channelId}` },
@@ -331,8 +336,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       })
 
+    const channelTopic = `channel-${channelId}-${user.id}-${Date.now()}`
     const ch = supabase
-      .channel(`channel-${channelId}`)
+      .channel(channelTopic)
       // ── Broadcast: instant delivery to all channel members ────────────────
       .on('broadcast', { event: 'new_message' }, (payload) => {
         const msg = payload.payload as Partial<MessageWithSender> & { id?: string; sender_id?: string }
@@ -414,8 +420,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       )
       .subscribe()
     chRef.current = ch
+    const typingTopic = `typing-ch-${channelId}-${user.id}-${Date.now()}`
     const typingCh = supabase
-      .channel(`typing-ch-${channelId}`)
+      .channel(typingTopic)
       .on('broadcast', { event: 'typing' }, (payload) => {
         const { userId: typingId, name } = payload.payload ?? {}
         if (!typingId || typingId === user.id) return
@@ -664,7 +671,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     }
     qc.invalidateQueries({ queryKey: ['channel-membership', channelId, user.id] })
     qc.invalidateQueries({ queryKey: ['channel-members', channelId] })
-    window.location.href = '/chat'
+    router.push('/chat')
   }
 
   async function saveChannelDetails() {
@@ -808,14 +815,26 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     localStorage.setItem(`channel-chat-style-${channelId}`, JSON.stringify(chatStyle))
   }, [channelId, chatStyle])
 
-  function startLongPress(messageId: string) {
+  function startLongPress(messageId: string, event: React.TouchEvent<HTMLElement>) {
     if (typeof window === 'undefined') return
     if (!window.matchMedia('(hover: none)').matches) return
+    const touch = event.touches[0]
+    if (!touch) return
+    longPressOriginRef.current = { x: touch.clientX, y: touch.clientY }
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current)
     longPressTimerRef.current = setTimeout(() => {
-      navigator.vibrate?.(10)
+      navigator.vibrate?.(16)
       setMobileActionFor(messageId)
     }, 420)
+  }
+
+  function handleLongPressMove(event: React.TouchEvent<HTMLElement>) {
+    const touch = event.touches[0]
+    const origin = longPressOriginRef.current
+    if (!touch || !origin) return
+    if (Math.abs(touch.clientX - origin.x) > 12 || Math.abs(touch.clientY - origin.y) > 12) {
+      clearLongPress()
+    }
   }
 
   function clearLongPress() {
@@ -823,6 +842,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       clearTimeout(longPressTimerRef.current)
       longPressTimerRef.current = null
     }
+    longPressOriginRef.current = null
   }
 
   if (memberCheckLoading) {
@@ -858,11 +878,11 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     >
       {/* Header */}
       <div
-        className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b dark:border-slate-800 shrink-0 backdrop-blur"
+        className="flex items-center gap-3 border-b px-3 py-3 sm:px-4 dark:border-slate-800 shrink-0 backdrop-blur"
         style={{
           background: channel?.banner_url
-            ? `linear-gradient(to right, ${hexToRgba(themeColor, 0.92)}, ${hexToRgba(themeColor, 0.68)}), url(${channel.banner_url}) center/cover`
-            : `linear-gradient(to right, ${hexToRgba(themeColor, 0.2)}, ${hexToRgba(themeColor, 0.08)})`,
+            ? `linear-gradient(to right, ${hexToRgba(themeColor, 0.9)}, ${hexToRgba(themeColor, 0.62)}), url(${channel.banner_url}) center/cover`
+            : `linear-gradient(to right, ${hexToRgba(themeColor, 0.24)}, ${hexToRgba(themeColor, 0.1)})`,
           borderColor: panelBorder,
         }}
       >
@@ -1148,8 +1168,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 pb-0 md:pb-3"
-        style={{ backgroundColor: channel?.banner_url ? hexToRgba(themeColor, 0.04) : undefined }}
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3 sm:px-4 sm:py-4 lg:px-6 space-y-1 pb-0 md:pb-3"
+        style={{ backgroundColor: channel?.banner_url ? hexToRgba(themeColor, 0.05) : undefined }}
       >
         {hasMore && (
           <div className="flex justify-center pb-2">
@@ -1165,8 +1185,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
-              <MessageCircle size={22} className="text-slate-400" />
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200/80 bg-white/85 shadow-sm dark:border-slate-700 dark:bg-slate-800/80">
+              <MessageCircle size={22} className="text-violet-600 dark:text-violet-300" />
             </div>
             <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No messages yet</p>
             <p className="text-xs text-slate-400 mt-1">Be the first to say something in #{channel?.name}!</p>
@@ -1194,8 +1214,11 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                   <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
                 </div>
               )}
-              <div
+              <motion.div
                 className={cn('group flex items-end gap-1', isOwn && 'flex-row-reverse', grouped && 'mt-0.5')}
+                initial={{ opacity: 0, y: 10, scale: 0.995 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1], delay: Math.min(i, 6) * 0.018 }}
               >
               {/* Avatar */}
               {!grouped ? (
@@ -1246,9 +1269,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                     style={isOwn
                       ? { backgroundColor: themeColor }
                       : { backgroundColor: incomingBubbleBg, borderColor: incomingBubbleBorder }}
-                    onTouchStart={() => startLongPress(msg.id)}
+                    onTouchStart={(e) => startLongPress(msg.id, e)}
                     onTouchEnd={clearLongPress}
-                    onTouchMove={clearLongPress}
+                    onTouchMove={handleLongPressMove}
                     onTouchCancel={clearLongPress}
                     onContextMenu={(e) => {
                       e.preventDefault()
@@ -1258,12 +1281,13 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                     {msg.media_url && (
                       <div className="p-2 pb-0">
                         {/\.(jpg|jpeg|png|gif|webp)$/i.test(msg.media_url) ? (
-                          <img
-                            src={msg.media_url}
-                            alt="attachment"
-                            className="max-w-full rounded-xl cursor-pointer"
-                            onClick={(e) => { e.stopPropagation(); window.open(msg.media_url!) }}
-                          />
+                          <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="block" onClick={(e) => e.stopPropagation()}>
+                            <img
+                              src={msg.media_url}
+                              alt="attachment"
+                              className="max-w-full rounded-xl cursor-pointer"
+                            />
+                          </a>
                         ) : (
                           <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className={cn('flex items-center gap-1.5 text-xs underline py-1 px-1', isOwn ? 'text-violet-200' : 'text-slate-700 dark:text-slate-200')}>
                             <Paperclip size={11} /> Attachment
@@ -1366,26 +1390,39 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                   <Copy size={13} />
                 </button>
               </div>
-            </div>
+              </motion.div>
             </React.Fragment>
           )
         })}
 
         {/* Typing indicator */}
-        {typingUsers.length > 0 && (
-          <div className="flex items-end gap-2 px-2 py-1">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tl-sm px-3 py-2.5">
-              <p className="text-xs text-slate-400 mb-1">
-                {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing
-              </p>
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+        <AnimatePresence>
+          {typingUsers.length > 0 && (
+            <motion.div
+              className="flex items-end gap-2 px-2 py-1"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.18 }}
+            >
+              <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tl-sm px-3 py-2.5">
+                <p className="text-xs text-slate-400 mb-1">
+                  {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing
+                </p>
+                <div className="flex gap-1">
+                  {[0, 1, 2].map((dot) => (
+                    <motion.span
+                      key={dot}
+                      className="w-1.5 h-1.5 rounded-full bg-slate-400"
+                      animate={{ y: [0, -3, 0], opacity: [0.45, 1, 0.45] }}
+                      transition={{ duration: 0.7, repeat: Infinity, ease: 'easeInOut', delay: dot * 0.1 }}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {showScrollBtn && (
           <div className="sticky bottom-4 flex justify-end pr-2 pointer-events-none">
@@ -1402,8 +1439,15 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         <div ref={bottomRef} />
       </div>
 
-      {mobileActionMessage && (
-        <div className="fixed inset-x-3 bottom-[calc(5.2rem+env(safe-area-inset-bottom))] z-40 md:hidden">
+      <AnimatePresence>
+        {mobileActionMessage && (
+          <motion.div
+            className="fixed inset-x-3 bottom-[calc(5.2rem+env(safe-area-inset-bottom))] z-40 md:hidden"
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
           <div className="rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
             <div className="mb-1 flex items-center justify-between px-1">
               <p className="text-[11px] font-medium text-slate-500">Message actions</p>
@@ -1448,8 +1492,9 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
               )}
             </div>
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* File preview */}
       {(mediaPreview || mediaFile) && (
