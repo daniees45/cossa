@@ -6,7 +6,7 @@ import { FeedSkeleton } from '@/components/social/FeedSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { SuggestedUsers } from '@/components/social/SuggestedUsers'
 import { TrendingTopics } from '@/components/social/TrendingTopics'
-import { LayoutGrid, Loader2, Users, Bookmark, ArrowUp, Megaphone } from 'lucide-react'
+import { LayoutGrid, Loader2, Users, Bookmark, Megaphone, ChevronsDown } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import type { PostWithAuthor } from '@/types/app'
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -141,20 +141,22 @@ export default function FeedPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-200/80 bg-white/80 p-2 text-center dark:border-slate-700 dark:bg-slate-900/60">
-                <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
-                  <p className="text-lg font-semibold text-slate-900 dark:text-white">{feed.length}</p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Loaded</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
-                  <p className="text-lg font-semibold text-slate-900 dark:text-white">{broadcasts.length}</p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Broadcasts</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/80">
-                  <p className="text-lg font-semibold text-slate-900 dark:text-white">{newCount}</p>
-                  <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">New</p>
-                </div>
-              </div>
+              <button
+                onClick={loadNewPosts}
+                disabled={newCount === 0}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition',
+                  newCount > 0
+                    ? 'border-cyan-300/80 bg-[linear-gradient(135deg,#0f172a,#1d4ed8)] text-white shadow-[0_14px_32px_rgba(30,64,175,0.26)] hover:translate-y-[-1px] hover:shadow-[0_18px_36px_rgba(30,64,175,0.3)]'
+                    : 'border-slate-200/80 bg-white/80 text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400',
+                )}
+              >
+                <ChevronsDown size={16} />
+                New posts
+                <span className={cn('rounded-full px-2 py-0.5 text-xs', newCount > 0 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300')}>
+                  {newCount}
+                </span>
+              </button>
             </div>
 
             <div className="mt-4 flex gap-1.5 overflow-x-auto rounded-2xl bg-slate-950/5 p-1.5 dark:bg-white/5">
@@ -200,17 +202,6 @@ export default function FeedPage() {
                 </div>
               ))}
             </section>
-          )}
-
-          {/* New posts banner */}
-          {newCount > 0 && (
-            <button
-              onClick={loadNewPosts}
-              className="flex w-full items-center justify-center gap-2 rounded-[1.3rem] bg-[linear-gradient(135deg,#0f172a,#7c3aed)] px-4 py-3 text-sm font-medium text-white shadow-[0_16px_34px_rgba(109,40,217,0.28)] transition hover:translate-y-[-1px] hover:shadow-[0_20px_42px_rgba(109,40,217,0.32)]"
-            >
-              <ArrowUp size={15} />
-              {newCount} new post{newCount !== 1 ? 's' : ''} — tap to load
-            </button>
           )}
 
           {/* Post editor (only on For You + Following tabs) */}
