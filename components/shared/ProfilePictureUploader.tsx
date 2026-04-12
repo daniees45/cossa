@@ -122,7 +122,7 @@ export function ProfilePictureUploader({
   if (showCropMode && preview) {
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full">
+        <div className="w-full max-w-md rounded-2xl bg-white p-5 dark:bg-slate-800 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Crop size={20} />
@@ -147,7 +147,7 @@ export function ProfilePictureUploader({
             style={{ aspectRatio }}
           />
 
-          <div className="flex gap-3">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row">
             <button
               onClick={handleCropComplete}
               disabled={loading}
@@ -204,7 +204,7 @@ export function ProfilePictureUploader({
           onClick={() => fileRef.current?.click()}
           disabled={loading}
           className={cn(
-            'absolute bottom-0 right-0 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-full flex items-center justify-center shadow-md transition-all opacity-0 group-hover:opacity-100',
+            'absolute bottom-0 right-0 flex items-center justify-center rounded-full bg-violet-600 text-white shadow-md transition-all hover:bg-violet-700 disabled:opacity-50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100',
             config.button
           )}
         >

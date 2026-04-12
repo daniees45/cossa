@@ -70,7 +70,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="w-full max-w-sm bg-slate-800/60 backdrop-blur border border-slate-700 rounded-2xl p-8 shadow-2xl">
+    <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-800/60 p-5 shadow-2xl backdrop-blur sm:p-8">
       <h2 className="text-white text-xl font-semibold mb-1">Welcome back</h2>
       <p className="text-slate-400 text-sm mb-6">Sign in to your COSSA account</p>
 

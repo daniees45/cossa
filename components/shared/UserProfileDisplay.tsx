@@ -60,7 +60,7 @@ export function UserProfileDisplay({
   return (
     <div className={cn('w-full', className)}>
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700 mb-4">
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200 pb-1 dark:border-slate-700">
         {tabOptions.map((tab) => {
           const Icon = tab.icon
           return (
@@ -68,14 +68,14 @@ export function UserProfileDisplay({
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
               className={cn(
-                'flex items-center gap-1 px-3 py-2 text-sm font-medium border-b-2 transition-colors',
+                'shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
                 activeTab === tab.value
                   ? 'border-violet-600 text-violet-600 dark:text-violet-400'
                   : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-300'
               )}
             >
               <Icon size={14} />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
             </button>
           )
         })}
@@ -87,7 +87,7 @@ export function UserProfileDisplay({
           <div className="space-y-4">
             {/* Banner */}
             {p.banner_url && (
-              <div className="h-32 rounded-lg overflow-hidden">
+              <div className="h-24 overflow-hidden rounded-lg sm:h-32">
                 <img
                   src={p.banner_url}
                   alt="Banner"
@@ -97,28 +97,28 @@ export function UserProfileDisplay({
             )}
 
             {/* Avatar and Info */}
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               <EnhancedAvatar
                 src={p.avatar_url}
                 name={p.full_name}
                 size="xl"
                 frame={(p.avatar_frame ?? 'classic') as any}
-                className="shrink-0"
+                className="mx-auto shrink-0 sm:mx-0"
               />
               
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1 text-center sm:text-left">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                   {p.full_name}
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">@{p.username}</p>
                 
                 {p.bio && (
-                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-2 line-clamp-3">
+                  <p className="mt-2 text-sm text-slate-600 line-clamp-4 dark:text-slate-300">
                     {p.bio}
                   </p>
                 )}
 
-                <div className="flex flex-wrap gap-2 mt-3">
+                <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
                   {p.level && (
                     <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                       Level {p.level}

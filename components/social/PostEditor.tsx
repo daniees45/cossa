@@ -97,8 +97,8 @@ export function PostEditor({ onPosted }: PostEditorProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
-      <div className="flex gap-3">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800 sm:p-4">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Avatar src={currentUser.avatar_url} name={currentUser.full_name} size="sm" />
         <div className="flex-1">
           <textarea
@@ -110,14 +110,14 @@ export function PostEditor({ onPosted }: PostEditorProps) {
             placeholder="What's on your mind?"
             rows={3}
             maxLength={MAX_CHARS + 50}
-            className="w-full bg-transparent text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 resize-none outline-none"
+            className="min-h-24 w-full resize-none bg-transparent text-sm text-slate-800 outline-none placeholder-slate-400 dark:text-slate-200"
           />
 
           {/* Image previews */}
           {previews.length > 0 && (
-            <div className="flex gap-2 mt-2 flex-wrap">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {previews.map((p, i) => (
-                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden">
+                <div key={i} className="relative aspect-square overflow-hidden rounded-xl sm:h-20 sm:w-20">
                   <img src={p} alt="" className="w-full h-full object-cover" />
                   <button
                     onClick={() => removeFile(i)}
@@ -128,16 +128,16 @@ export function PostEditor({ onPosted }: PostEditorProps) {
             </div>
           )}
 
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 gap-2 flex-wrap">
+          <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
             {/* Left: type pills + photo */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
               {POST_TYPES.map((t) => (
                 <button
                   key={t.value}
                   type="button"
                   onClick={() => setPostType(t.value)}
                   className={cn(
-                    'flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition',
+                    'shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition',
                     postType === t.value
                       ? 'bg-violet-600 border-violet-600 text-white'
                       : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600',
@@ -149,7 +149,7 @@ export function PostEditor({ onPosted }: PostEditorProps) {
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-violet-400 hover:text-violet-600 transition"
+                className="flex shrink-0 items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-600 dark:text-slate-400"
               >
                 <Image size={13} /> Photo
               </button>
@@ -157,7 +157,7 @@ export function PostEditor({ onPosted }: PostEditorProps) {
             </div>
 
             {/* Right: counter + post button */}
-            <div className="flex items-center gap-3">
+            <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
               {showCounter && (
                 <div className="flex items-center gap-1.5">
                   <svg width="24" height="24" viewBox="0 0 24 24" className="-rotate-90">
@@ -178,7 +178,7 @@ export function PostEditor({ onPosted }: PostEditorProps) {
               <button
                 onClick={submit}
                 disabled={submitting || (!content.trim() && files.length === 0) || isOverLimit}
-                className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition disabled:opacity-40 flex items-center gap-2"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-40 sm:w-auto"
               >
                 {submitting && <Loader2 size={14} className="animate-spin" />}
                 Post

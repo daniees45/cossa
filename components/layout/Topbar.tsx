@@ -87,13 +87,13 @@ export function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex items-center h-14 px-3 sm:px-4 md:px-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 gap-2 sm:gap-3">
+    <header className="sticky top-0 z-40 flex h-14 min-w-0 items-center gap-1.5 border-b border-slate-200 bg-white/80 px-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 sm:gap-3 sm:px-4 md:px-6">
       {/* COSSA logo - mobile only */}
-      <div className="md:hidden flex items-center gap-2 mr-2">
+      <div className="mr-1.5 flex min-w-0 items-center gap-2 md:hidden sm:mr-2">
         <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
           <span className="text-white font-bold text-xs">C</span>
         </div>
-        <span className="font-bold text-slate-900 dark:text-white text-sm">COSSA</span>
+        <span className="max-w-20 truncate text-sm font-bold text-slate-900 dark:text-white min-[370px]:max-w-none">COSSA</span>
       </div>
 
       {/* Search */}
@@ -108,10 +108,10 @@ export function Topbar() {
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
 
-      <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2.5">
         <button
           onClick={() => setSearchOpen(true)}
-          className="sm:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-500 dark:text-slate-400"
+          className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden"
           title="Search"
         >
           <Search size={18} />
@@ -178,7 +178,7 @@ export function Topbar() {
 
         {/* Avatar */}
         {user && (
-          <Link href={`/profile/${user.username}`} className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden">
+          <Link href={`/profile/${user.username}`} className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-violet-600 text-xs font-bold text-white">
             {user.avatar_url
               ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
               : getInitials(user.full_name)}
@@ -194,7 +194,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-      className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-500 dark:text-slate-400"
+      className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
       title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}

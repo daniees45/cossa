@@ -10,7 +10,6 @@ import { Camera, Loader2, ArrowLeft, Image as ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 import { ProfilePictureUploader } from '@/components/shared/ProfilePictureUploader'
 import { EnhancedAvatar } from '@/components/shared/EnhancedAvatar'
-import { FrameShowcase } from '@/components/shared/AvatarFrame'
 import { cn } from '@/lib/utils/cn'
 
 const LEVELS = ['100', '200', '300', '400', 'postgrad'] as const
@@ -130,18 +129,18 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
+    <div className="mx-auto max-w-3xl px-3 py-4 sm:px-4 sm:py-6">
       <Link
         href={`/profile/${user.username}`}
-        className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 mb-6 transition-colors"
+        className="mb-5 inline-flex items-center gap-2 text-sm text-slate-500 transition-colors hover:text-slate-800 dark:hover:text-slate-200 sm:mb-6"
       >
         <ArrowLeft size={16} />
         Back to profile
       </Link>
 
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
         {/* Banner Section */}
-        <div className="relative h-32 bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 dark:from-violet-900 dark:via-purple-900 dark:to-pink-900 overflow-hidden group cursor-pointer">
+        <div className="group relative h-28 cursor-pointer overflow-hidden bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 dark:from-violet-900 dark:via-purple-900 dark:to-pink-900 sm:h-32">
           {user.banner_url && (
             <img
               src={user.banner_url}
@@ -174,8 +173,8 @@ export default function EditProfilePage() {
           />
         </div>
 
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Edit Profile</h1>
+        <div className="p-4 sm:p-6">
+          <h1 className="mb-5 text-2xl font-bold text-slate-900 dark:text-white sm:mb-6">Edit Profile</h1>
 
           <form onSubmit={handleSave} className="space-y-6">
             {/* Avatar and Preview */}
@@ -213,7 +212,7 @@ export default function EditProfilePage() {
             {/* Avatar Frame Selection */}
             <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Avatar Frame</h2>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-3 min-[420px]:grid-cols-3 sm:grid-cols-4">
                 {AVATAR_FRAMES.map((frame) => (
                   <button
                     key={frame}
@@ -233,7 +232,7 @@ export default function EditProfilePage() {
                       frame={frame as any}
                       className="mx-auto mb-2"
                     />
-                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300 capitalize">{frame}</span>
+                    <span className="block truncate text-xs font-medium capitalize text-slate-700 dark:text-slate-300">{frame}</span>
                   </button>
                 ))}
               </div>
@@ -283,7 +282,7 @@ export default function EditProfilePage() {
               </div>
 
               {/* Level + Department */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Level</label>
                   <select
@@ -310,18 +309,18 @@ export default function EditProfilePage() {
             </div>
 
             {/* Submit */}
-            <div className="flex gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-2 dark:border-slate-700 sm:flex-row sm:items-center sm:gap-3">
               <button
                 type="submit"
                 disabled={saving || uploadingBanner}
-                className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-medium px-6 py-3 rounded-lg transition-colors text-sm"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-50 sm:w-auto"
               >
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 Save Changes
               </button>
               <Link
                 href={`/profile/${user.username}`}
-                className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 px-4 py-3"
+                className="inline-flex w-full items-center justify-center px-4 py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 sm:w-auto"
               >
                 Cancel
               </Link>

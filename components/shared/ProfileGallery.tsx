@@ -47,7 +47,7 @@ export function ProfileGallery({
         <span className="text-sm text-slate-500 dark:text-slate-400">({pictures.length})</span>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4">
         {pictures.map((picture) => (
           <div
             key={picture.id}
@@ -66,9 +66,9 @@ export function ProfileGallery({
               />
 
               {/* Overlay */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/15 opacity-100 transition-colors sm:bg-black/0 sm:opacity-0 sm:group-hover:bg-black/40 sm:group-hover:opacity-100">
                 <button
-                  className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 rounded-lg text-xs font-medium"
+                  className="rounded-lg bg-white px-3 py-2 text-xs font-medium text-slate-900 dark:bg-slate-800 dark:text-white"
                   onClick={(e) => {
                     e.stopPropagation()
                     onSelectPicture?.(picture)
@@ -108,7 +108,7 @@ export function ProfileGallery({
                     onDeletePicture(picture.id)
                   }
                 }}
-                className="absolute top-1 right-1 p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute right-1 top-1 rounded-full bg-red-500 p-1.5 text-white opacity-100 transition-opacity hover:bg-red-600 sm:opacity-0 sm:group-hover:opacity-100"
               >
                 <Trash2 size={14} />
               </button>
@@ -149,7 +149,7 @@ export function ProfilePictureComparison({
   }
 
   return (
-    <div className="flex gap-4 justify-center items-end">
+    <div className="flex flex-col items-center justify-center gap-4 sm:flex-row sm:items-end">
       <div className="text-center">
         <div className="mb-2">
           <EnhancedAvatar
@@ -162,7 +162,7 @@ export function ProfilePictureComparison({
         <p className="text-xs text-slate-500 dark:text-slate-400">Previous</p>
       </div>
 
-      <div className="text-2xl text-slate-400 dark:text-slate-600">→</div>
+      <div className="text-2xl text-slate-400 dark:text-slate-600 sm:block">→</div>
 
       <div className="text-center">
         <div className="mb-2">

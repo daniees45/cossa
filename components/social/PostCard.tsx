@@ -126,12 +126,12 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
       <div className="p-4">
         {/* Header */}
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <Link href={`/profile/${post.author.username}`} className="flex items-center gap-2.5">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <Link href={`/profile/${post.author.username}`} className="flex min-w-0 flex-1 items-center gap-2.5">
             <Avatar src={post.author.avatar_url} name={post.author.full_name} size="sm" />
-            <div>
-              <p className="text-sm font-semibold text-slate-900 dark:text-white leading-none">{post.author.full_name}</p>
-              <p className="text-xs text-slate-400 mt-0.5">@{post.author.username} · {timeAgo(post.created_at)}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold leading-none text-slate-900 dark:text-white">{post.author.full_name}</p>
+              <p className="mt-0.5 truncate text-xs text-slate-400">@{post.author.username} · {timeAgo(post.created_at)}</p>
             </div>
           </Link>
           {user && (
@@ -163,7 +163,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
         {/* Content */}
         <div
-          className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed mb-3 whitespace-pre-wrap"
+          className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800 dark:text-slate-200"
           dangerouslySetInnerHTML={{ __html: post.content }}
         />
 
@@ -176,16 +176,16 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             {post.media_urls.map((url, i) => {
               const isVideo = /\.(mp4|webm|mov|ogg)$/i.test(url)
               return isVideo ? (
-                <video key={i} src={url} controls className="w-full h-48 object-cover" />
+                <video key={i} src={url} controls className={cn('w-full object-cover', post.media_urls?.length === 1 ? 'h-64 sm:h-80' : 'h-40 sm:h-48')} />
               ) : (
-                <img key={i} src={url} alt="" className="w-full h-48 object-cover" />
+                <img key={i} src={url} alt="" className={cn('w-full object-cover', post.media_urls?.length === 1 ? 'h-64 sm:h-80' : 'h-40 sm:h-48')} />
               )
             })}
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-4 pt-3 border-t border-slate-100 dark:border-slate-700">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-3 dark:border-slate-700">
           <button
             onClick={toggleLike}
             className={cn(
@@ -231,9 +231,9 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
       {/* Report modal */}
       {showReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4 sm:pb-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowReport(false)} />
-          <div className="relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm shadow-2xl">
+          <div className="relative max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:rounded-2xl sm:p-6">
             <button onClick={() => setShowReport(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
               <X size={16} />
             </button>
@@ -266,7 +266,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
               rows={2}
               className="w-full text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-violet-500 resize-none mb-4"
             />
-            <div className="flex gap-3">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row">
               <button
                 onClick={submitReport}
                 disabled={!reportReason || reporting}
@@ -287,9 +287,9 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
       {/* Delete confirmation */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4 sm:pb-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDelete(false)} />
-          <div className="relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 w-full max-w-sm shadow-2xl">
+          <div className="relative max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:rounded-2xl sm:p-6">
             <button onClick={() => setConfirmDelete(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
               <X size={16} />
             </button>
@@ -298,7 +298,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             </div>
             <h3 className="font-semibold text-slate-900 dark:text-white mb-1">Delete post?</h3>
             <p className="text-sm text-slate-500 mb-5">This can&apos;t be undone. The post and all its comments will be permanently removed.</p>
-            <div className="flex gap-3">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row">
               <button
                 onClick={deletePost}
                 disabled={deleting}
@@ -460,18 +460,18 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
               </button>
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={replyingTo ? `Reply to ${replyingTo.name}…` : 'Write a comment…'}
-              className="flex-1 text-xs bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500"
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none placeholder-slate-400 focus:ring-2 focus:ring-violet-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
             />
             <button
               type="submit"
               disabled={!text.trim()}
-              className="px-3 py-2 rounded-xl bg-violet-600 text-white text-xs font-medium disabled:opacity-40"
+              className="w-full rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40 sm:w-auto"
             >
               Post
             </button>
@@ -488,12 +488,12 @@ function CommentItem({ comment, onReply, depth = 0 }: {
   depth?: number
 }) {
   return (
-    <div className={cn('flex gap-2.5', depth > 0 && 'ml-8 mt-2')}>
+    <div className={cn('flex items-start gap-2.5', depth > 0 && 'ml-4 mt-2 sm:ml-8')}>
       <Avatar src={comment.author.avatar_url} name={comment.author.full_name} size="sm" />
       <div className="flex-1 min-w-0">
         <div className="bg-slate-50 dark:bg-slate-700 rounded-xl px-3 py-2">
           <p className="text-xs font-semibold text-slate-800 dark:text-white">{comment.author.full_name}</p>
-          <p className="text-xs text-slate-700 dark:text-slate-200 mt-0.5">{comment.content}</p>
+          <p className="mt-0.5 break-words text-xs text-slate-700 dark:text-slate-200">{comment.content}</p>
         </div>
         <div className="flex items-center gap-3 mt-1 ml-1">
           <span className="text-[10px] text-slate-400">{timeAgo(comment.created_at)}</span>

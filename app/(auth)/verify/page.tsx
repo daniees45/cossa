@@ -32,7 +32,7 @@ export default function VerifyPage() {
   }
 
   return (
-    <div className="w-full max-w-sm bg-slate-800/60 backdrop-blur border border-slate-700 rounded-2xl p-8 shadow-2xl text-center">
+    <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-800/60 p-5 text-center shadow-2xl backdrop-blur sm:p-8">
       <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-violet-600/20 mb-4">
         <MailCheck className="text-violet-400" size={28} />
       </div>

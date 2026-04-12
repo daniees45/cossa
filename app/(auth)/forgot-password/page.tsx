@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="w-full max-w-sm bg-slate-800/60 backdrop-blur border border-slate-700 rounded-2xl p-8 shadow-2xl text-center">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-800/60 p-5 text-center shadow-2xl backdrop-blur sm:p-8">
         <div className="flex justify-center mb-4">
           <div className="w-14 h-14 rounded-full bg-violet-600/20 flex items-center justify-center">
             <MailCheck size={28} className="text-violet-400" />
@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="w-full max-w-sm bg-slate-800/60 backdrop-blur border border-slate-700 rounded-2xl p-8 shadow-2xl">
+    <div className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-800/60 p-5 shadow-2xl backdrop-blur sm:p-8">
       <h2 className="text-white text-xl font-semibold mb-1">Reset password</h2>
       <p className="text-slate-400 text-sm mb-6">
         Enter your email and we'll send you a reset link.

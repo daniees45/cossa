@@ -97,14 +97,14 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-start justify-center pt-[10vh] px-4">
+    <div className="fixed inset-0 z-[120] flex items-end justify-center px-3 pb-3 pt-8 sm:items-start sm:px-4 sm:pb-0 sm:pt-[10vh]">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+      <div className="relative flex max-h-[92dvh] w-full max-w-xl flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:max-h-[70dvh] sm:rounded-2xl">
         {/* Input */}
-        <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 dark:border-slate-700">
+        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-slate-700">
           <Search size={18} className="text-slate-400 shrink-0" />
           <input
             ref={inputRef}
@@ -122,7 +122,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
         </div>
 
         {/* Results */}
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {query.trim().length < 2 && (
             <p className="text-xs text-slate-400 text-center py-6">Type at least 2 characters to search</p>
           )}
@@ -172,7 +172,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
           )}
 
           {hasResults && (
-            <div className="border-t border-slate-100 dark:border-slate-700 px-4 py-2.5">
+            <div className="border-t border-slate-100 px-4 py-2.5 dark:border-slate-700">
               <p className="text-xs text-slate-400">Press Esc to close</p>
             </div>
           )}

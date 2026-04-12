@@ -39,7 +39,7 @@ export function MobileSlideOver({ open, onClose, title, children, className }: M
             <X size={16} />
           </button>
         </div>
-        <div className="flex-1">{children}</div>
+        <div className="flex-1 pb-[env(safe-area-inset-bottom)]">{children}</div>
       </div>
     </div>
   )

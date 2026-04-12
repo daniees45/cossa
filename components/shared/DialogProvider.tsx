@@ -90,7 +90,7 @@ function ConfirmModal({
   return (
     // Backdrop
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4 sm:pb-4"
       aria-modal="true"
       role="dialog"
       aria-labelledby="dialog-title"
@@ -104,8 +104,8 @@ function ConfirmModal({
       />
 
       {/* Panel */}
-      <div className="relative z-10 w-full max-w-sm mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div className="px-6 pt-6 pb-5">
+      <div className="relative z-10 w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl">
+        <div className="px-5 pb-5 pt-6 sm:px-6">
           {title && (
             <h2
               id="dialog-title"
@@ -125,18 +125,18 @@ function ConfirmModal({
           </p>
         </div>
 
-        <div className="flex gap-2 px-6 pb-5 justify-end">
+        <div className="flex flex-col-reverse gap-2 px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-6 sm:pb-5">
           <button
             autoFocus
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+            className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 sm:w-auto sm:py-2"
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
             className={cn(
-              'px-4 py-2 rounded-xl text-sm font-medium text-white transition',
+              'w-full rounded-xl px-4 py-2.5 text-sm font-medium text-white transition sm:w-auto sm:py-2',
               variant === 'danger'
                 ? 'bg-red-500 hover:bg-red-600'
                 : 'bg-violet-600 hover:bg-violet-500',
