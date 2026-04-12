@@ -1,18 +1,19 @@
 -- ============================================================
 -- COSSA — Channel profile personalization
--- Adds channel avatar image, emoji icon, and theme color
+-- Adds channel avatar image, emoji icon, theme color, and banner
 -- ============================================================
 
 ALTER TABLE channels
 ADD COLUMN IF NOT EXISTS avatar_url text,
 ADD COLUMN IF NOT EXISTS emoji_icon text,
-ADD COLUMN IF NOT EXISTS color_hex text DEFAULT '#7c3aed';
+ADD COLUMN IF NOT EXISTS color_hex text DEFAULT '#7c3aed',
+ADD COLUMN IF NOT EXISTS banner_url text;
 
 UPDATE channels
 SET color_hex = '#7c3aed'
 WHERE color_hex IS NULL;
 
--- Replace existing function signature to support channel avatar fields.
+-- Replace existing function signature to support channel avatar and banner fields.
 DROP FUNCTION IF EXISTS update_channel_details(uuid, text, text);
 
 CREATE OR REPLACE FUNCTION update_channel_details(
@@ -21,7 +22,8 @@ CREATE OR REPLACE FUNCTION update_channel_details(
   p_description text DEFAULT NULL,
   p_avatar_url text DEFAULT NULL,
   p_emoji_icon text DEFAULT NULL,
-  p_color_hex text DEFAULT NULL
+  p_color_hex text DEFAULT NULL,
+  p_banner_url text DEFAULT NULL
 )
 RETURNS json
 LANGUAGE plpgsql
@@ -96,11 +98,15 @@ BEGIN
       WHEN p_emoji_icon IS NULL THEN emoji_icon
       ELSE nullif(trim(p_emoji_icon), '')
     END,
-    color_hex = v_effective_color
+    color_hex = v_effective_color,
+    banner_url = CASE
+      WHEN p_banner_url IS NULL THEN banner_url
+      ELSE nullif(trim(p_banner_url), '')
+    END
   WHERE id = p_channel_id;
 
   RETURN json_build_object('ok', true);
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION update_channel_details(uuid, text, text, text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION update_channel_details(uuid, text, text, text, text, text, text) TO authenticated;

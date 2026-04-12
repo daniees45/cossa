@@ -397,6 +397,7 @@ export interface Database {
           avatar_url: string | null
           emoji_icon: string | null
           color_hex: string | null
+          banner_url: string | null
           type: 'public' | 'private' | 'announcement'
           private_join_mode: 'approval' | 'code'
           private_entry_code: string | null
@@ -410,6 +411,7 @@ export interface Database {
           avatar_url?: string | null
           emoji_icon?: string | null
           color_hex?: string | null
+          banner_url?: string | null
           type?: 'public' | 'private' | 'announcement'
           private_join_mode?: 'approval' | 'code'
           private_entry_code?: string | null
@@ -422,6 +424,7 @@ export interface Database {
           avatar_url?: string | null
           emoji_icon?: string | null
           color_hex?: string | null
+          banner_url?: string | null
           type?: 'public' | 'private' | 'announcement'
           private_join_mode?: 'approval' | 'code'
           private_entry_code?: string | null
@@ -737,6 +740,7 @@ export interface Database {
           p_avatar_url?: string | null
           p_emoji_icon?: string | null
           p_color_hex?: string | null
+          p_banner_url?: string | null
         }
         Returns: { ok: boolean; error?: string }
       }

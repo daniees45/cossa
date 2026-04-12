@@ -1,13 +1,15 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { toast } from 'sonner'
-import { Plus, Trash2, Loader2, Hash, Lock, Megaphone, Pencil } from 'lucide-react'
+import { Plus, Trash2, Loader2, Hash, Lock, Megaphone, Pencil, Upload, X, Image as ImageIcon } from 'lucide-react'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { formatDate } from '@/lib/utils/formatDate'
 import { ChannelAvatar } from '@/components/shared/ChannelAvatar'
+import { ChannelAvatarEditor } from '@/components/shared/ChannelAvatarEditor'
+import { uploadFile } from '@/lib/utils/uploadFile'
 import type { Database } from '@/types/database'
 
 type ChannelType = 'public' | 'private' | 'announcement'
@@ -28,6 +30,7 @@ export default function AdminChannelsPage() {
   const { user } = useUser()
   const qc = useQueryClient()
   const { confirm } = useDialog()
+  const bannerRef = useRef<HTMLInputElement>(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     name: '',
@@ -35,9 +38,12 @@ export default function AdminChannelsPage() {
     type: 'public' as ChannelType,
     private_join_mode: 'approval' as 'approval' | 'code',
     private_entry_code: '',
+    avatar_url: '' as string | null,
+    banner_url: '' as string | null,
   })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [uploadingBanner, setUploadingBanner] = useState(false)
 
   const { data: channels = [], isLoading } = useQuery({
     queryKey: ['admin-channels'],
@@ -148,6 +154,8 @@ export default function AdminChannelsPage() {
       type: ch.type as ChannelType,
       private_join_mode: (ch.private_join_mode ?? 'approval') as 'approval' | 'code',
       private_entry_code: ch.private_entry_code ?? '',
+      avatar_url: ch.avatar_url ?? '',
+      banner_url: ch.banner_url ?? '',
     })
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -156,7 +164,7 @@ export default function AdminChannelsPage() {
   function cancelForm() {
     setShowForm(false)
     setEditingId(null)
-    setForm({ name: '', description: '', type: 'public', private_join_mode: 'approval', private_entry_code: '' })
+    setForm({ name: '', description: '', type: 'public', private_join_mode: 'approval', private_entry_code: '', avatar_url: '', banner_url: '' })
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -165,22 +173,19 @@ export default function AdminChannelsPage() {
       setSubmitting(true)
       try {
         const supabase = createClient()
-        const { error } = await supabase
-          .from('channels')
-          .update({
-            description: form.description.trim() || null,
-            type: form.type,
-            private_join_mode: form.type === 'private' ? form.private_join_mode : 'approval',
-            private_entry_code: form.type === 'private' && form.private_join_mode === 'code'
-              ? (form.private_entry_code.trim() || null)
-              : null,
-          })
-          .eq('id', editingId)
+        const { data, error } = await supabase.rpc('update_channel_details', {
+          p_channel_id: editingId,
+          p_description: form.description.trim() || null,
+          p_avatar_url: form.avatar_url || null,
+          p_banner_url: form.banner_url || null,
+        })
         if (error) throw error
+        const result = data as { ok: boolean; error?: string }
+        if (!result.ok) throw new Error(result.error ?? 'Failed to update channel')
         toast.success('Channel updated!')
         cancelForm()
         qc.invalidateQueries({ queryKey: ['admin-channels'] })
-      } catch {
+      } catch (err) {
         toast.error('Failed to update channel')
       } finally {
         setSubmitting(false)
@@ -200,6 +205,8 @@ export default function AdminChannelsPage() {
         private_entry_code: form.type === 'private' && form.private_join_mode === 'code'
           ? (form.private_entry_code.trim() || null)
           : null,
+        avatar_url: form.avatar_url || null,
+        banner_url: form.banner_url || null,
         created_by: user!.id,
       }).select('id').single()
       if (error) throw error
@@ -339,6 +346,100 @@ export default function AdminChannelsPage() {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Avatar & Banner Section */}
+          <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4 space-y-4">
+            <h3 className="font-semibold text-slate-900 dark:text-white">Channel Branding</h3>
+            
+            {/* Avatar Editor */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+              <h4 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Channel Avatar & Icon</h4>
+              <ChannelAvatarEditor
+                channelId={editingId || 'new'}
+                channelName={form.name || 'channel'}
+                currentAvatar={form.avatar_url ?? undefined}
+                currentEmoji={undefined}
+                currentColor="#7c3aed"
+                isAdmin={true}
+                onUpdate={async (data) => {
+                  if (data.avatar_url !== undefined) {
+                    setForm(prev => ({ ...prev, avatar_url: data.avatar_url ?? null }))
+                  }
+                }}
+              />
+            </div>
+
+            {/* Banner Upload */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg space-y-3">
+              <h4 className="text-sm font-medium text-slate-900 dark:text-white">Channel Banner</h4>
+              
+              {form.banner_url && (
+                <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={form.banner_url}
+                    alt="channel banner"
+                    className="w-full h-24 object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, banner_url: '' }))}
+                    className="absolute top-1.5 right-1.5 p-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+              
+              <button
+                type="button"
+                onClick={() => bannerRef.current?.click()}
+                disabled={uploadingBanner}
+                className="w-full py-6 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover:border-violet-400 dark:hover:border-violet-600 transition-colors disabled:opacity-50 flex flex-col items-center justify-center gap-2"
+              >
+                {uploadingBanner ? (
+                  <Loader2 className="animate-spin text-slate-400" size={24} />
+                ) : (
+                  <>
+                    <Upload size={20} className="text-slate-400" />
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      Click to upload banner
+                    </span>
+                    <span className="text-xs text-slate-400">PNG, JPG up to 5MB</span>
+                  </>
+                )}
+              </button>
+              
+              <input
+                ref={bannerRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  
+                  if (file.size > 5 * 1024 * 1024) {
+                    toast.error('Banner must be under 5MB')
+                    return
+                  }
+
+                  setUploadingBanner(true)
+                  try {
+                    const channelId = editingId || 'new'
+                    const path = `${channelId}/banner-${Date.now()}`
+                    const banner_url = await uploadFile(file, 'gallery', path)
+                    setForm(prev => ({ ...prev, banner_url }))
+                    toast.success('Banner uploaded!')
+                  } catch {
+                    toast.error('Failed to upload banner')
+                  } finally {
+                    setUploadingBanner(false)
+                  }
+                }}
+                className="hidden"
+              />
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">
