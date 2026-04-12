@@ -4,6 +4,7 @@ import { Topbar } from '@/components/layout/Topbar'
 import { RealtimeProvider } from '@/components/layout/RealtimeProvider'
 import { DialogProvider } from '@/components/shared/DialogProvider'
 import { NavigationProgress } from '@/components/shared/NavigationProgress'
+import { DashboardTransitionShell } from '@/components/layout/DashboardTransitionShell'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,7 +16,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <Topbar />
             <main className="flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
-              {children}
+              <DashboardTransitionShell>{children}</DashboardTransitionShell>
             </main>
           </div>
         </div>

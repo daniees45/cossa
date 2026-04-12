@@ -1,5 +1,6 @@
 'use client'
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils/cn'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -56,17 +57,19 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   return (
     <DialogContext.Provider value={{ confirm }}>
       {children}
-      {modal?.open && (
-        <ConfirmModal
-          title={modal.title}
-          message={modal.message}
-          confirmLabel={modal.confirmLabel}
-          cancelLabel={modal.cancelLabel}
-          variant={modal.variant}
-          onConfirm={() => handle(true)}
-          onCancel={() => handle(false)}
-        />
-      )}
+      <AnimatePresence>
+        {modal?.open && (
+          <ConfirmModal
+            title={modal.title}
+            message={modal.message}
+            confirmLabel={modal.confirmLabel}
+            cancelLabel={modal.cancelLabel}
+            variant={modal.variant}
+            onConfirm={() => handle(true)}
+            onCancel={() => handle(false)}
+          />
+        )}
+      </AnimatePresence>
     </DialogContext.Provider>
   )
 }
@@ -88,23 +91,33 @@ function ConfirmModal({
   onCancel,
 }: ConfirmModalProps) {
   return (
-    // Backdrop
-    <div
+    <motion.div
       className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4 sm:pb-4"
       aria-modal="true"
       role="dialog"
       aria-labelledby="dialog-title"
       aria-describedby="dialog-desc"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
     >
-      {/* Overlay */}
-      <div
+      <motion.div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onCancel}
         aria-hidden="true"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
       />
 
-      {/* Panel */}
-      <div className="relative z-10 w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl">
+      <motion.div
+        className="relative z-10 w-full max-w-sm overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900 sm:rounded-2xl"
+        initial={{ opacity: 0, y: 24, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 18, scale: 0.97 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      >
         <div className="px-5 pb-5 pt-6 sm:px-6">
           {title && (
             <h2
@@ -145,7 +158,7 @@ function ConfirmModal({
             {confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }

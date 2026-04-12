@@ -49,6 +49,36 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-block {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--border) 70%, white 30%);
+}
+
+.dark .shimmer-block {
+  background: color-mix(in srgb, var(--border) 78%, black 22%);
+}
+
+.shimmer-block::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.45s ease-in-out infinite;
+  animation-delay: var(--shimmer-delay, 0ms);
+}
+
+.dark .shimmer-block::after {
+  background: linear-gradient(90deg, transparent, rgba(226, 232, 240, 0.14), transparent);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

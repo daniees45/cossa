@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
 import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh, Flag } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -30,6 +31,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const [reportReason, setReportReason] = useState<ReportReason | ''>('')
   const [reportNote, setReportNote] = useState('')
   const [reporting, setReporting] = useState(false)
+  const [removed, setRemoved] = useState(false)
 
   // Sync when React Query cache is updated by realtime (likes/comments from others)
   useEffect(() => { setLikes(post.likes_count) }, [post.likes_count])
@@ -67,8 +69,14 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
     setDeleting(true)
     const supabase = createClient()
     const { error } = await supabase.from('posts').delete().eq('id', post.id)
-    if (error) { toast.error('Failed to delete post'); setDeleting(false) }
-    else onDeleted?.(post.id)
+    if (error) {
+      toast.error('Failed to delete post')
+      setDeleting(false)
+    } else {
+      setConfirmDelete(false)
+      setDeleting(false)
+      setRemoved(true)
+    }
   }
 
   function handleShare() {
@@ -102,7 +110,16 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   }
 
   return (
-    <article className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+    <AnimatePresence mode="popLayout" onExitComplete={() => onDeleted?.(post.id)}>
+      {!removed && (
+        <motion.article
+          layout
+          initial={{ opacity: 0, y: 14, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -12, scale: 0.97 }}
+          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+        >
       {/* Pinned banner */}
       {post.pinned && (
         <div className="flex items-center gap-1.5 px-4 py-2 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800">
@@ -230,10 +247,16 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
       )}
 
       {/* Report modal */}
-      {showReport && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4 sm:pb-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowReport(false)} />
-          <div className="relative max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:rounded-2xl sm:p-6">
+      <AnimatePresence>
+        {showReport && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4 sm:pb-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div className="absolute inset-0 bg-black/40" onClick={() => setShowReport(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+            <motion.div className="relative max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:rounded-2xl sm:p-6" initial={{ opacity: 0, y: 22, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
             <button onClick={() => setShowReport(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
               <X size={16} />
             </button>
@@ -281,15 +304,17 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Delete confirmation */}
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4 sm:pb-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDelete(false)} />
-          <div className="relative max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:rounded-2xl sm:p-6">
+      <AnimatePresence>
+        {confirmDelete && (
+          <motion.div className="fixed inset-0 z-50 flex items-end justify-center px-3 pb-3 pt-8 sm:items-center sm:px-4 sm:pb-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDelete(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
+            <motion.div className="relative max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-800 sm:rounded-2xl sm:p-6" initial={{ opacity: 0, y: 22, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
             <button onClick={() => setConfirmDelete(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
               <X size={16} />
             </button>
@@ -313,10 +338,13 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
                 Cancel
               </button>
             </div>
-          </div>
-        </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+        </motion.article>
       )}
-    </article>
+    </AnimatePresence>
   )
 }
 
