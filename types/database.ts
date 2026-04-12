@@ -435,9 +435,9 @@ export interface Database {
         Relationships: []
       }
       channel_members: {
-        Row: { channel_id: string; user_id: string; role: string }
-        Insert: { channel_id: string; user_id: string; role?: string }
-        Update: { role?: string }
+        Row: { channel_id: string; user_id: string; role: string; last_seen_at: string | null }
+        Insert: { channel_id: string; user_id: string; role?: string; last_seen_at?: string | null }
+        Update: { role?: string; last_seen_at?: string | null }
         Relationships: []
       }
       channel_join_requests: {
@@ -794,6 +794,16 @@ export interface Database {
           p_channel_id: string
         }
         Returns: { ok: boolean; error?: string }
+      }
+      mark_channel_read_progress: {
+        Args: {
+          p_channel_id: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      get_channel_unread_counts: {
+        Args: Record<string, never>
+        Returns: Array<{ channel_id: string; unread_count: number }>
       }
       set_encrypted_private_key: {
         Args: {

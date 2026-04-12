@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { timeAgo } from '@/lib/utils/formatDate'
-import type { Channel, MessageWithSender } from '@/types/app'
+import type { Channel, MessageWithSender, Profile } from '@/types/app'
 import type { Database } from '@/types/database'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import Link from 'next/link'
@@ -139,6 +139,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const fileInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
+  const senderProfileCacheRef = useRef<Record<string, Profile>>({})
+  const senderFetchPromisesRef = useRef<Record<string, Promise<Profile | null>>>({})
 
   const { data: channel } = useQuery({
     queryKey: ['channel', channelId],
@@ -234,6 +236,46 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     }
   }, [channelId, qc])
 
+  function cacheSenderProfile(profile: Profile | null | undefined) {
+    if (!profile) return
+    senderProfileCacheRef.current[profile.id] = profile
+  }
+
+  async function getSenderProfile(senderId: string): Promise<Profile | null> {
+    const cached = senderProfileCacheRef.current[senderId]
+    if (cached) return cached
+
+    const pending = senderFetchPromisesRef.current[senderId]
+    if (pending) return pending
+
+    const supabase = createClient()
+    const req: Promise<Profile | null> = (async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', senderId)
+          .single()
+        const profile = (data as Profile | null) ?? null
+        if (profile) senderProfileCacheRef.current[senderId] = profile
+        return profile
+      } finally {
+        delete senderFetchPromisesRef.current[senderId]
+      }
+    })()
+
+    senderFetchPromisesRef.current[senderId] = req
+    return req
+  }
+
+  async function hydrateMessageSenderRow(
+    row: Database['public']['Tables']['messages']['Row'],
+  ): Promise<MessageWithSender | null> {
+    const sender = await getSenderProfile(row.sender_id)
+    if (!sender) return null
+    return { ...row, sender } as MessageWithSender
+  }
+
   // Mark channel as read on mount
   useEffect(() => {
     setChannelUnread(channelId, 0)
@@ -280,10 +322,11 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       .then(({ data }) => {
         if (data) {
           const msgs = data as unknown as MessageWithSender[]
+          for (const m of msgs) cacheSenderProfile(m.sender)
           setMessages(msgs)
           setHasMore(data.length === 50)
           loadReactions(msgs.map((m) => m.id))
-          markChannelSeen(msgs.map((m) => m.id))
+          markChannelSeen()
         }
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'auto' }), 50)
       })
@@ -292,37 +335,48 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       .channel(`channel-${channelId}`)
       // ── Broadcast: instant delivery to all channel members ────────────────
       .on('broadcast', { event: 'new_message' }, (payload) => {
-        const msg = payload.payload as MessageWithSender
-        if (!msg?.id) return
-        setMessages((prev) =>
-          prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
-        )
-        if (msg.sender_id !== user?.id) {
-          markChannelSeen([msg.id])
+        const msg = payload.payload as Partial<MessageWithSender> & { id?: string; sender_id?: string }
+        if (!msg?.id || !msg.sender_id) return
+
+        const withSender = async () => {
+          let hydrated: MessageWithSender | null = null
+          if (msg.sender) {
+            cacheSenderProfile(msg.sender as Profile)
+            hydrated = msg as MessageWithSender
+          } else {
+            hydrated = await hydrateMessageSenderRow(msg as Database['public']['Tables']['messages']['Row'])
+          }
+          if (!hydrated) return
+
+          setMessages((prev) =>
+            prev.find((m) => m.id === hydrated!.id) ? prev : [...prev, hydrated!]
+          )
+          if (hydrated.sender_id !== user?.id) {
+            markChannelSeen()
+          }
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
         }
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+
+        void withSender()
       })
       // ── postgres_changes: fallback for multi-device / future-proofing ───────
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
         async (payload) => {
-          const { data: msg } = await supabase
-            .from('messages')
-            .select('*, sender:profiles!sender_id(*)')
-            .eq('id', payload.new.id)
-            .single()
-          if (msg) {
-            setMessages((prev) =>
-              prev.find((m) => m.id === (msg as { id: string }).id)
-                ? prev
-                : [...prev, msg as unknown as MessageWithSender]
-            )
-            if ((msg as { sender_id?: string }).sender_id !== user?.id) {
-              markChannelSeen([(msg as { id: string }).id])
-            }
-            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+          const row = payload.new as Database['public']['Tables']['messages']['Row']
+          const msg = await hydrateMessageSenderRow(row)
+          if (!msg) return
+
+          setMessages((prev) =>
+            prev.find((m) => m.id === msg.id)
+              ? prev
+              : [...prev, msg]
+          )
+          if (msg.sender_id !== user?.id) {
+            markChannelSeen()
           }
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
         },
       )
       .on(
@@ -412,7 +466,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     setMessages((prev) => [...older, ...prev])
     setHasMore(data.length === 50)
     loadReactions(older.map((m) => m.id))
-    markChannelSeen(older.map((m) => m.id))
+    markChannelSeen()
     requestAnimationFrame(() => {
       if (container) container.scrollTop = container.scrollHeight - prevHeight
     })
@@ -506,10 +560,10 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     setEditText(msg.content)
   }
 
-  async function markChannelSeen(messageIds?: string[]) {
+  async function markChannelSeen() {
     if (!user) return
     const supabase = createClient()
-    const { error } = await supabase.rpc('mark_channel_messages_viewed', { p_channel_id: channelId })
+    const { error } = await supabase.rpc('mark_channel_read_progress', { p_channel_id: channelId })
     if (!error) return
 
     const missingRpc =
@@ -520,13 +574,11 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       return
     }
 
-    const ids = (messageIds ?? messages.map((m) => m.id)).filter(Boolean)
-    if (!ids.length) return
-    const uniqueIds = Array.from(new Set(ids))
-    const payload = uniqueIds.map((id) => ({ message_id: id, viewer_id: user.id }))
-    const { error: fallbackError } = await (supabase
-      .from('message_views' as never)
-      .upsert(payload as never, { onConflict: 'message_id,viewer_id', ignoreDuplicates: true }))
+    const { error: fallbackError } = await supabase
+      .from('channel_members')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('channel_id', channelId)
+      .eq('user_id', user.id)
     if (fallbackError) {
       console.error('Fallback mark seen failed:', fallbackError)
     }

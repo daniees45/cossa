@@ -18,7 +18,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname()
   const router = useRouter()
   const qc = useQueryClient()
-  const { dmUnread, clearDmUnread, channelUnread, setChannelUnread } = useChatStore()
+  const { dmUnread, clearDmUnread, channelUnread, setChannelUnread, incChannelUnread } = useChatStore()
 
   // New DM search
   const [showDmSearch, setShowDmSearch] = useState(false)
@@ -112,13 +112,60 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     },
   })
 
+  const { data: dbChannelUnread } = useQuery({
+    queryKey: ['channel-unread'],
+    enabled: !!user,
+    staleTime: Infinity,
+    queryFn: async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase.rpc('get_channel_unread_counts')
+      if (error || !data) return {} as Record<string, number>
+      const counts: Record<string, number> = {}
+      for (const row of data as Array<{ channel_id: string; unread_count: number }>) {
+        counts[row.channel_id] = row.unread_count
+      }
+      return counts
+    },
+  })
+
   // Clear channel unread when visiting the channel page
   useEffect(() => {
     const match = pathname.match(/^\/chat\/([^/]+)$/)
     if (match && match[1] !== 'dm') {
       setChannelUnread(match[1], 0)
+      qc.setQueryData<Record<string, number>>(['channel-unread'], (prev) => {
+        if (!prev) return prev
+        return { ...prev, [match[1]]: 0 }
+      })
     }
-  }, [pathname, setChannelUnread])
+  }, [pathname, setChannelUnread, qc])
+
+  useEffect(() => {
+    if (!user || !myChannelIds) return
+    const supabase = createClient()
+    const ch = supabase
+      .channel(`channel-unread-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const row = payload.new as { channel_id: string | null; sender_id: string }
+          if (!row.channel_id) return
+          if (row.sender_id === user.id) return
+          if (!myChannelIds.has(row.channel_id)) return
+          if (pathname === `/chat/${row.channel_id}`) {
+            setChannelUnread(row.channel_id, 0)
+            return
+          }
+          incChannelUnread(row.channel_id)
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(ch)
+    }
+  }, [user, myChannelIds, pathname, setChannelUnread, incChannelUnread])
 
   // DM user search
   useEffect(() => {
@@ -144,6 +191,10 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
 
   function totalUnreadFor(userId: string) {
     return (dbUnread?.[userId] ?? 0) + (dmUnread[userId] ?? 0)
+  }
+
+  function totalChannelUnreadFor(channelId: string) {
+    return (dbChannelUnread?.[channelId] ?? 0) + (channelUnread[channelId] ?? 0)
   }
 
   function navigateToDm(uid: string) {
@@ -268,8 +319,9 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                 Request
               </button>
             </div>
-            {channels?.map((ch) => (
-              <button
+            {channels?.map((ch) => {
+              const unread = totalChannelUnreadFor(ch.id)
+              return <button
                 key={ch.id}
                 onClick={() => handleChannelClick(ch)}
                 className={cn(
@@ -292,16 +344,16 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                 {ch.type === 'private' && (
                   <Lock size={12} className="text-amber-500 shrink-0" />
                 )}
-                {(channelUnread[ch.id] ?? 0) > 0 && pathname !== `/chat/${ch.id}` && (
+                {unread > 0 && pathname !== `/chat/${ch.id}` && (
                   <span className="min-w-[18px] h-[18px] rounded-full bg-violet-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
-                    {(channelUnread[ch.id] ?? 0) > 99 ? '99+' : channelUnread[ch.id]}
+                    {unread > 99 ? '99+' : unread}
                   </span>
                 )}
                 {myChannelIds && !myChannelIds.has(ch.id) && pathname !== `/chat/${ch.id}` && (
                   <span className="text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 font-medium px-1.5 py-0.5 rounded-full shrink-0">Join</span>
                 )}
               </button>
-            ))}
+            })}
           </div>
 
           {/* DMs */}

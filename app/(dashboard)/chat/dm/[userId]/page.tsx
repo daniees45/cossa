@@ -117,6 +117,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const senderProfileCacheRef = useRef<Record<string, Profile>>({})
+  const senderFetchPromisesRef = useRef<Record<string, Promise<Profile | null>>>({})
 
   const { data: other } = useQuery({
     queryKey: ['profile', userId],
@@ -130,6 +132,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   // ── E2EE setup ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !other) return
+    senderProfileCacheRef.current[user.id] = user as Profile
+    senderProfileCacheRef.current[other.id] = other
     const currentUser = user
     const otherUser = other
     let cancelled = false
@@ -195,6 +199,41 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     initE2EE()
     return () => { cancelled = true }
   }, [user, other])
+
+  async function getSenderProfile(senderId: string): Promise<Profile | null> {
+    const cached = senderProfileCacheRef.current[senderId]
+    if (cached) return cached
+
+    const pending = senderFetchPromisesRef.current[senderId]
+    if (pending) return pending
+
+    const supabase = createClient()
+    const req: Promise<Profile | null> = (async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', senderId)
+          .single()
+        const profile = (data as Profile | null) ?? null
+        if (profile) senderProfileCacheRef.current[senderId] = profile
+        return profile
+      } finally {
+        delete senderFetchPromisesRef.current[senderId]
+      }
+    })()
+
+    senderFetchPromisesRef.current[senderId] = req
+    return req
+  }
+
+  async function hydrateMessageSenderRow(
+    row: { id: string; sender_id: string; receiver_id: string | null; content: string; media_url: string | null; read_at: string | null; edited_at: string | null; created_at: string; channel_id: string | null; deleted_for_sender: boolean },
+  ): Promise<MessageWithSender | null> {
+    const sender = await getSenderProfile(row.sender_id)
+    if (!sender) return null
+    return { ...row, sender } as MessageWithSender
+  }
 
   // ── Decrypt whenever messages change ────────────────────────────────────
   useEffect(() => {
@@ -287,6 +326,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       .then(({ data }) => {
         if (data) {
           const msgs = data as unknown as MessageWithSender[]
+          for (const m of msgs) senderProfileCacheRef.current[m.sender.id] = m.sender
           setMessages(msgs)
           setHasMore(data.length === 50)
           loadReactions(msgs.map((m) => m.id))
@@ -311,24 +351,31 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     // receiver see messages the instant they are inserted.
     async function handleNewDmMessage(payload: { new: Record<string, unknown> }) {
       if (!user) return
-      const row = payload.new as { id: string; sender_id: string; receiver_id: string }
+      const row = payload.new as {
+        id: string
+        sender_id: string
+        receiver_id: string
+        channel_id: string | null
+        content: string
+        media_url: string | null
+        read_at: string | null
+        edited_at: string | null
+        created_at: string
+        deleted_for_sender: boolean
+      }
       // Only care about messages in THIS conversation
       const inConversation =
         (row.sender_id === user.id && row.receiver_id === userId) ||
         (row.sender_id === userId && row.receiver_id === user.id)
       if (!inConversation) return
 
-      const { data: msg } = await supabase
-        .from('messages')
-        .select('*, sender:profiles!sender_id(*)')
-        .eq('id', row.id)
-        .single()
+      const msg = await hydrateMessageSenderRow(row)
       if (!msg) return
 
       setMessages((prev) =>
         prev.find((m) => m.id === row.id)
           ? prev
-          : [...prev, msg as unknown as MessageWithSender]
+          : [...prev, msg]
       )
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
 
