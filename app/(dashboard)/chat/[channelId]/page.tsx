@@ -1088,7 +1088,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 pb-[env(safe-area-inset-bottom)] md:pb-3"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 pb-1 md:pb-3"
         style={{ backgroundColor: channel?.banner_url ? hexToRgba(themeColor, 0.04) : undefined }}
       >
         {hasMore && (

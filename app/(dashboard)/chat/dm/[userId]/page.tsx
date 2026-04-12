@@ -844,7 +844,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.05),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.12),transparent_45%)] pb-[env(safe-area-inset-bottom)] md:pb-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.05),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.12),transparent_45%)] pb-1 md:pb-3">
         {hasMore && (
           <div className="flex justify-center pb-2">
             <button
