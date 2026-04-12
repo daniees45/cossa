@@ -57,6 +57,19 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
+function hexToRgba(hex: string | null | undefined, alpha: number) {
+  const safeHex = (hex ?? '#7c3aed').replace('#', '')
+  const normalized = safeHex.length === 3
+    ? safeHex.split('').map((c) => c + c).join('')
+    : safeHex
+  const value = Number.parseInt(normalized, 16)
+  if (Number.isNaN(value)) return `rgba(124,58,237,${alpha})`
+  const r = (value >> 16) & 255
+  const g = (value >> 8) & 255
+  const b = value & 255
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 export default function ChannelPage({ params }: { params: Promise<{ channelId: string }> }) {
   const { channelId } = use(params)
   const { user } = useUser()
@@ -457,7 +470,22 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     }
   }
 
-  function startEdit(msg: MessageWithSender) {
+  async function startEdit(msg: MessageWithSender) {
+    if (!user) return
+    const supabase = createClient()
+    const { data, error } = await supabase.rpc('check_can_edit_message', {
+      p_message_id: msg.id,
+      p_user_id: user.id,
+    })
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    const result = data as { ok: boolean; error?: string }
+    if (!result?.ok) {
+      toast.error(result?.error ?? 'Cannot edit this message')
+      return
+    }
     setEditingId(msg.id)
     setEditText(msg.content)
   }
@@ -582,6 +610,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       p_avatar_url: channelAvatarDraft,
       p_emoji_icon: channelEmojiDraft,
       p_color_hex: channelColorDraft,
+      p_banner_url: channel?.banner_url ?? null,
     })
     setSavingChannelDetails(false)
     if (error) {
@@ -670,6 +699,10 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   }
 
   const isMuted = mutedChannels.includes(channelId)
+  const themeColor = channel?.color_hex ?? '#7c3aed'
+  const panelBg = hexToRgba(themeColor, 0.06)
+  const panelBorder = hexToRgba(themeColor, 0.2)
+  const accentSoft = hexToRgba(themeColor, 0.18)
 
   if (memberCheckLoading) {
     return (
@@ -697,9 +730,21 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   }
 
   return (
-    <div className="flex flex-col h-full" onClick={() => setPickerFor(null)}>
+    <div
+      className="flex flex-col h-full"
+      onClick={() => setPickerFor(null)}
+      style={{ backgroundColor: panelBg }}
+    >
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+      <div
+        className="flex items-center gap-3 px-4 py-3 border-b dark:border-slate-800 shrink-0"
+        style={{
+          background: channel?.banner_url
+            ? `linear-gradient(to right, ${hexToRgba(themeColor, 0.92)}, ${hexToRgba(themeColor, 0.68)}), url(${channel.banner_url}) center/cover`
+            : `linear-gradient(to right, ${hexToRgba(themeColor, 0.2)}, ${hexToRgba(themeColor, 0.08)})`,
+          borderColor: panelBorder,
+        }}
+      >
         <Link href="/chat" className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
           <ArrowLeft size={18} className="text-slate-600 dark:text-slate-300" />
         </Link>
@@ -713,7 +758,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-900 dark:text-white text-sm">{channel?.name}</p>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-200">
             {channel?.description && <span className="truncate">{channel.description}</span>}
             {memberCount !== undefined && (
               <span className="flex items-center gap-0.5 shrink-0"><Users size={10} /> {memberCount} {memberCount === 1 ? 'member' : 'members'}</span>
@@ -937,7 +982,11 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-1"
+        style={{ backgroundColor: channel?.banner_url ? hexToRgba(themeColor, 0.04) : undefined }}
+      >
         {hasMore && (
           <div className="flex justify-center pb-2">
             <button
@@ -1026,9 +1075,10 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                     className={cn(
                       'rounded-2xl text-sm inline-block',
                       isOwn
-                        ? 'bg-violet-600 text-white rounded-tr-sm'
+                        ? 'text-white rounded-tr-sm'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-sm',
                     )}
+                    style={isOwn ? { backgroundColor: themeColor } : undefined}
                   >
                     {msg.media_url && (
                       <div className="p-2 pb-0">
@@ -1119,7 +1169,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                 {isOwn && editingId !== msg.id && (
                   <>
                     <button
-                      onClick={(e) => { e.stopPropagation(); startEdit(msg) }}
+                      onClick={(e) => { e.stopPropagation(); void startEdit(msg) }}
                       className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
                     >
                       <Pencil size={13} />
@@ -1206,7 +1256,8 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       <form
         ref={formRef}
         onSubmit={sendMessage}
-        className="flex items-end gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
+        className="flex items-end gap-2 px-4 py-3 border-t dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
+        style={{ borderColor: panelBorder, backgroundColor: hexToRgba(themeColor, 0.05) }}
       >
         <input
           ref={fileInputRef}
@@ -1231,12 +1282,14 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
           }}
           rows={1}
           placeholder="Type a message…"
-          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500 resize-none max-h-32 overflow-y-auto"
+          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none resize-none max-h-32 overflow-y-auto"
+          style={{ boxShadow: `0 0 0 0 ${accentSoft}` }}
         />
         <button
           type="submit"
           disabled={(!text.trim() && !mediaFile) || sending || uploading}
-          className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
+          className="w-10 h-10 rounded-xl disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
+          style={{ backgroundColor: themeColor }}
         >
           {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
         </button>
