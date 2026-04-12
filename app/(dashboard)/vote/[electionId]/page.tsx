@@ -18,13 +18,10 @@ type ElectionWithEligibility = Election & {
   require_index_number: boolean
 }
 
-type VoteReceiptItem = {
-  candidate_id: string
-  candidate: {
-    position: string
-    photo_url: string | null
-    profile: { full_name: string; avatar_url: string | null }
-  }
+type VoteReceipt = {
+  id: string
+  receipt_code: string
+  created_at: string
 }
 
 export default function VoteBallotPage({ params }: { params: Promise<{ electionId: string }> }) {
@@ -63,35 +60,21 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
     },
   })
 
-  const { data: hasVoted } = useQuery({
-    queryKey: ['has-voted', electionId, user?.id],
+  const { data: voteReceipt } = useQuery({
+    queryKey: ['vote-receipt', electionId, user?.id],
     enabled: !!user,
     queryFn: async () => {
       const supabase = createClient()
       const { data } = await supabase
-        .from('votes')
-        .select('id')
+        .from('election_vote_receipts')
+        .select('id, receipt_code, created_at')
         .eq('election_id', electionId)
         .eq('voter_id', user!.id)
         .maybeSingle()
-      return !!data
+      return (data ?? null) as VoteReceipt | null
     },
   })
-
-  // Vote receipt — requires migration 010 (votes_select_own policy)
-  const { data: myVotes } = useQuery({
-    queryKey: ['my-votes', electionId, user?.id],
-    enabled: !!user && hasVoted === true,
-    queryFn: async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('votes')
-        .select('candidate_id, candidate:candidates!candidate_id(position, photo_url, profile:profiles!user_id(full_name, avatar_url))')
-        .eq('election_id', electionId)
-        .eq('voter_id', user!.id)
-      return (data ?? []) as unknown as VoteReceiptItem[]
-    },
-  })
+  const hasVoted = !!voteReceipt
 
   // Voter roll: does this election require voter-roll verification?
   const { data: rollCount } = useQuery({
@@ -136,13 +119,12 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
       const { data, error } = await supabase.rpc('verify_voter', {
         p_election_id: electionId,
         p_student_id:  studentId.toUpperCase().trim(),
-        p_user_id:     user.id,
       })
       if (error) { setVerifyError(error.message); return }
-      const result = data as { ok: boolean; error?: string; name?: string }
+      const result = data as { ok: boolean; error?: string; student_id?: string }
       if (!result.ok) { setVerifyError(result.error ?? 'Verification failed'); return }
       setJustVerified(true)
-      toast.success(`Verified as ${result.name}`)
+      toast.success(`Student ID ${result.student_id ?? studentId.toUpperCase().trim()} verified`)
     } finally {
       setVerifying(false)
     }
@@ -163,7 +145,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
     },
     onSuccess: () => {
       toast.success('Vote cast successfully!')
-      qc.invalidateQueries({ queryKey: ['has-voted', electionId] })
+      qc.invalidateQueries({ queryKey: ['vote-receipt', electionId] })
       router.push('/vote')
     },
     onError: (e: Error) => toast.error(e.message),
@@ -231,8 +213,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-sm font-mono outline-none focus:ring-2 focus:ring-violet-500 uppercase placeholder:uppercase placeholder:opacity-40"
               />
               <p className="text-xs text-slate-400 mt-1.5">
-                Your profile name must match the name on the voter list. It is matched against:{' '}
-                <span className="font-medium text-slate-600 dark:text-slate-300">{user?.full_name}</span>
+                Use the student ID that appears on your school voter list.
               </p>
             </div>
 
@@ -255,7 +236,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
         </div>
 
         <p className="text-center text-xs text-slate-400">
-          If your student ID is not on the voter list or your name doesn&apos;t match, contact the election admin.
+          If your student ID is not on the voter list, contact the election admin.
         </p>
       </div>
     )
@@ -295,27 +276,21 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
           <p className="text-slate-500 text-sm">Your vote has been securely recorded.</p>
         </div>
 
-        {myVotes && myVotes.length > 0 && (
+        {voteReceipt && (
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Your vote receipt</p>
-              <p className="text-xs text-slate-400 mt-0.5">A summary of how you voted in this election</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Anonymous vote receipt</p>
+              <p className="text-xs text-slate-400 mt-0.5">Your participation proof is stored separately from ballot selections.</p>
             </div>
-            <div className="divide-y divide-slate-100 dark:divide-slate-700">
-              {myVotes.map((v) => (
-                <div key={v.candidate_id} className="flex items-center gap-3 px-4 py-3">
-                  <Avatar
-                    src={v.candidate.photo_url ?? v.candidate.profile.avatar_url}
-                    name={v.candidate.profile.full_name}
-                    size="sm"
-                  />
-                  <div>
-                    <p className="text-xs text-slate-500">{v.candidate.position}</p>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{v.candidate.profile.full_name}</p>
-                  </div>
-                  <CheckCircle2 size={16} className="text-green-500 ml-auto shrink-0" />
-                </div>
-              ))}
+            <div className="px-4 py-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">Receipt code</p>
+                <p className="text-sm font-mono font-semibold text-slate-900 dark:text-white">{voteReceipt.receipt_code}</p>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">Recorded</p>
+                <p className="text-sm text-slate-700 dark:text-slate-300">{new Date(voteReceipt.created_at).toLocaleString()}</p>
+              </div>
             </div>
           </div>
         )}

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { Badge } from '@/components/shared/Badge'
@@ -16,6 +16,7 @@ type Role = 'student' | 'admin' | 'super_admin'
 type Tab = 'users' | 'reports'
 
 const ROLE_OPTIONS: Role[] = ['student', 'admin', 'super_admin']
+const PAGE_SIZE = 50
 
 type ReportRow = {
   id: string
@@ -30,7 +31,6 @@ type ReportRow = {
 }
 
 type PostReport = Database['public']['Tables']['post_reports']['Row']
-type AuditDetails = Database['public']['Functions']['log_admin_action']['Args']['p_details']
 
 export default function AdminUsersPage() {
   const { user: currentUser } = useUser()
@@ -41,45 +41,62 @@ export default function AdminUsersPage() {
   const [filter, setFilter] = useState<'all' | 'banned' | 'reported'>('all')
   const [expandedBan, setExpandedBan] = useState<string | null>(null)
   const [banReason, setBanReason] = useState('')
-
-  async function logAdminAction(action: string, targetType: string, targetId: string | null, details: AuditDetails = {}) {
-    try {
-      const supabase = createClient()
-      await supabase.rpc('log_admin_action', {
-        p_action: action,
-        p_target_type: targetType,
-        p_target_id: targetId,
-        p_details: details,
-      })
-    } catch {
-      // Avoid blocking critical admin actions if logging fails.
-    }
-  }
+  const [usersPage, setUsersPage] = useState(1)
+  const [reportsPage, setReportsPage] = useState(1)
 
   // ── Users ───────────────────────────────────────────────────────────────────
-  const { data: users = [] } = useQuery({
-    queryKey: ['admin-users'],
+  const { data: usersResult } = useQuery({
+    queryKey: ['admin-users', usersPage],
     queryFn: async () => {
       const supabase = createClient()
-      const { data } = await supabase
+      const from = (usersPage - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+      const { data, count, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-      return (data ?? []) as Profile[]
+        .range(from, to)
+      if (error) throw error
+      return {
+        rows: (data ?? []) as Profile[],
+        total: count ?? 0,
+      }
+    },
+  })
+  const users = usersResult?.rows ?? []
+  const usersTotal = usersResult?.total ?? 0
+  const usersTotalPages = Math.max(1, Math.ceil(usersTotal / PAGE_SIZE))
+
+  const { data: bannedTotal = 0 } = useQuery({
+    queryKey: ['admin-users-banned-total'],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_banned', true)
+      if (error) throw error
+      return count ?? 0
     },
   })
 
   // ── Reports ─────────────────────────────────────────────────────────────────
-  const { data: reports = [], refetch: refetchReports } = useQuery({
-    queryKey: ['admin-reports'],
+  const { data: reportsResult } = useQuery({
+    queryKey: ['admin-reports', reportsPage],
     queryFn: async () => {
       const supabase = createClient()
+      const from = (reportsPage - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
       // Step 1: get reports + reporter profile
-      const { data: rdata } = await supabase
+      const { data: rdata, count, error } = await supabase
         .from('post_reports')
-        .select('id, reason, note, status, created_at, post_id, reporter_id')
+        .select('id, reason, note, status, created_at, post_id, reporter_id', { count: 'exact' })
         .order('created_at', { ascending: false })
-      if (!rdata?.length) return [] as ReportRow[]
+        .range(from, to)
+      if (error) throw error
+      if (!rdata?.length) {
+        return { rows: [] as ReportRow[], total: count ?? 0 }
+      }
 
       // Step 2: get posts (content)
       const postIds = [...new Set(rdata.map((r) => r.post_id))]
@@ -100,7 +117,7 @@ export default function AdminUsersPage() {
       const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p]))
       const postMap    = Object.fromEntries((posts ?? []).map((p) => [p.id, p]))
 
-      return (rdata as PostReport[]).map((r) => {
+      const rows = (rdata as PostReport[]).map((r) => {
         const post = postMap[r.post_id]
         return {
           id: r.id,
@@ -114,36 +131,62 @@ export default function AdminUsersPage() {
           post_content: post?.content ?? null,
         }
       }).filter((r) => r.reported_user) as ReportRow[]
+
+      return { rows, total: count ?? 0 }
+    },
+  })
+  const reports = reportsResult?.rows ?? []
+  const reportsTotal = reportsResult?.total ?? 0
+  const reportsTotalPages = Math.max(1, Math.ceil(reportsTotal / PAGE_SIZE))
+
+  const { data: pendingCount = 0 } = useQuery({
+    queryKey: ['admin-reports-pending-total'],
+    queryFn: async () => {
+      const supabase = createClient()
+      const { count, error } = await supabase
+        .from('post_reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+      if (error) throw error
+      return count ?? 0
     },
   })
 
   // ── Mutations ───────────────────────────────────────────────────────────────
   const { mutate: updateRole } = useMutation({
-    mutationFn: async ({ id, role, previousRole }: { id: string; role: Role; previousRole: Role }) => {
+    mutationFn: async ({ id, role }: { id: string; role: Role }) => {
       const supabase = createClient()
-      const { error } = await supabase.from('profiles').update({ role }).eq('id', id)
+      const { data, error } = await supabase.rpc('admin_set_user_role', {
+        p_target_user_id: id,
+        p_new_role: role,
+      })
       if (error) throw error
-      await logAdminAction('role_changed', 'profile', id, { previousRole, newRole: role })
+      const result = data as { ok: boolean; error?: string }
+      if (!result.ok) throw new Error(result.error ?? 'Failed to update role')
     },
-    onSuccess: () => { toast.success('Role updated'); qc.invalidateQueries({ queryKey: ['admin-users'] }) },
+    onSuccess: () => {
+      toast.success('Role updated')
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+    },
     onError: () => toast.error('Failed to update role'),
   })
 
   const { mutate: updateBan } = useMutation({
     mutationFn: async ({ id, is_banned, ban_reason }: { id: string; is_banned: boolean; ban_reason?: string }) => {
       const supabase = createClient()
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_banned, ban_reason: is_banned ? (ban_reason ?? null) : null })
-        .eq('id', id)
-      if (error) throw error
-      await logAdminAction(is_banned ? 'user_banned' : 'user_unbanned', 'profile', id, {
-        banReason: is_banned ? (ban_reason ?? null) : null,
+      const { data, error } = await supabase.rpc('admin_set_user_ban', {
+        p_target_user_id: id,
+        p_is_banned: is_banned,
+        p_ban_reason: is_banned ? (ban_reason ?? null) : null,
       })
+      if (error) throw error
+      const result = data as { ok: boolean; error?: string }
+      if (!result.ok) throw new Error(result.error ?? 'Failed to update ban status')
     },
     onSuccess: (_, { is_banned }) => {
       toast.success(is_banned ? 'User banned' : 'User unbanned')
       qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['admin-users-banned-total'] })
       qc.invalidateQueries({ queryKey: ['admin-reports'] })
       setExpandedBan(null)
       setBanReason('')
@@ -154,21 +197,38 @@ export default function AdminUsersPage() {
   const { mutate: updateReportStatus } = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: 'reviewed' | 'dismissed' }) => {
       const supabase = createClient()
-      const { error } = await supabase.from('post_reports').update({ status }).eq('id', id)
+      const { data, error } = await supabase.rpc('admin_set_post_report_status', {
+        p_report_id: id,
+        p_status: status,
+      })
       if (error) throw error
-      await logAdminAction('report_status_updated', 'post_report', id, { status })
+      const result = data as { ok: boolean; error?: string }
+      if (!result.ok) throw new Error(result.error ?? 'Failed to update report')
     },
-    onSuccess: () => { toast.success('Report updated'); refetchReports() },
+    onSuccess: () => {
+      toast.success('Report updated')
+      qc.invalidateQueries({ queryKey: ['admin-reports'] })
+      qc.invalidateQueries({ queryKey: ['admin-reports-pending-total'] })
+    },
     onError: () => toast.error('Failed to update report'),
   })
 
   const { mutate: deleteReport } = useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient()
-      await supabase.from('post_reports').delete().eq('id', id)
-      await logAdminAction('report_deleted', 'post_report', id)
+      const { data, error } = await supabase.rpc('admin_delete_post_report', {
+        p_report_id: id,
+      })
+      if (error) throw error
+      const result = data as { ok: boolean; error?: string }
+      if (!result.ok) throw new Error(result.error ?? 'Failed to delete report')
     },
-    onSuccess: () => { toast.success('Report deleted'); refetchReports() },
+    onSuccess: () => {
+      toast.success('Report deleted')
+      qc.invalidateQueries({ queryKey: ['admin-reports'] })
+      qc.invalidateQueries({ queryKey: ['admin-reports-pending-total'] })
+    },
+    onError: () => toast.error('Failed to delete report'),
   })
 
   // ── Derived ─────────────────────────────────────────────────────────────────
@@ -188,8 +248,7 @@ export default function AdminUsersPage() {
     return true
   })
 
-  const pendingCount = reports.filter((r) => r.status === 'pending').length
-  const bannedCount = users.filter((u) => u.is_banned).length
+  const bannedCount = bannedTotal
   const reportedUsersCount = new Set(reports.map((r) => r.reported_user.id)).size
 
   return (
@@ -201,10 +260,10 @@ export default function AdminUsersPage() {
             <p className="mt-1 text-sm text-slate-300">Manage roles, ban status, and moderation reports from one command surface.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">Users: {users.length}</span>
+            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">Users: {usersTotal}</span>
             <span className="rounded-full border border-red-300/25 bg-red-500/15 px-3 py-1 text-xs text-red-200">Banned: {bannedCount}</span>
             <span className="rounded-full border border-amber-300/25 bg-amber-500/15 px-3 py-1 text-xs text-amber-200">Pending reports: {pendingCount}</span>
-            <span className="rounded-full border border-cyan-300/25 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-200">Reported users: {reportedUsersCount}</span>
+            <span className="rounded-full border border-cyan-300/25 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-200">Reported users (page): {reportedUsersCount}</span>
           </div>
         </div>
       </div>
@@ -217,7 +276,7 @@ export default function AdminUsersPage() {
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${tab === 'users' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             Users
-            <span className="ml-1.5 text-xs text-slate-400">({users.length})</span>
+              <span className="ml-1.5 text-xs text-slate-400">({usersTotal})</span>
           </button>
           <button
             onClick={() => setTab('reports')}
@@ -272,7 +331,7 @@ export default function AdminUsersPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {filtered.map((user) => (
-                  <>
+                  <Fragment key={user.id}>
                     <tr key={user.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition ${user.is_banned ? 'opacity-60' : ''}`}>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
@@ -291,7 +350,7 @@ export default function AdminUsersPage() {
                         {isSuperAdmin && user.id !== currentUser?.id ? (
                           <select
                             value={user.role}
-                            onChange={(e) => updateRole({ id: user.id, role: e.target.value as Role, previousRole: user.role })}
+                            onChange={(e) => updateRole({ id: user.id, role: e.target.value as Role })}
                             className="text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-500"
                           >
                             {ROLE_OPTIONS.map((r) => (
@@ -369,7 +428,7 @@ export default function AdminUsersPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
                 {filtered.length === 0 && (
                   <tr>
@@ -378,6 +437,25 @@ export default function AdminUsersPage() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-700 px-4 py-3">
+            <p className="text-xs text-slate-500">Page {usersPage} of {usersTotalPages}</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                disabled={usersPage <= 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setUsersPage((p) => Math.min(usersTotalPages, p + 1))}
+                disabled={usersPage >= usersTotalPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600 text-white disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -496,6 +574,25 @@ export default function AdminUsersPage() {
               </div>
             ))
           )}
+          <div className="flex items-center justify-between border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-4 py-3">
+            <p className="text-xs text-slate-500">Page {reportsPage} of {reportsTotalPages}</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setReportsPage((p) => Math.max(1, p - 1))}
+                disabled={reportsPage <= 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setReportsPage((p) => Math.min(reportsTotalPages, p + 1))}
+                disabled={reportsPage >= reportsTotalPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600 text-white disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

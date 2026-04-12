@@ -15,6 +15,17 @@ type ElectionWithEligibility = Election & {
   require_index_number: boolean
 }
 
+type RuntimeElectionStatus = 'draft' | 'active' | 'closed'
+
+function deriveElectionStatus(startsAt: string, endsAt: string): RuntimeElectionStatus {
+  const now = Date.now()
+  const starts = new Date(startsAt).getTime()
+  const ends = new Date(endsAt).getTime()
+  if (now < starts) return 'draft'
+  if (now >= ends) return 'closed'
+  return 'active'
+}
+
 export default function VotePage() {
   const { data: elections, isLoading } = useQuery({
     queryKey: ['elections'],
@@ -28,9 +39,9 @@ export default function VotePage() {
     },
   })
 
-  const active = elections?.filter((e) => e.status === 'active') ?? []
-  const upcoming = elections?.filter((e) => e.status === 'draft') ?? []
-  const closed = elections?.filter((e) => e.status === 'closed') ?? []
+  const active = elections?.filter((e) => deriveElectionStatus(e.starts_at, e.ends_at) === 'active') ?? []
+  const upcoming = elections?.filter((e) => deriveElectionStatus(e.starts_at, e.ends_at) === 'draft') ?? []
+  const closed = elections?.filter((e) => deriveElectionStatus(e.starts_at, e.ends_at) === 'closed') ?? []
 
   return (
     <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-8">
@@ -91,9 +102,10 @@ export default function VotePage() {
 }
 
 function ElectionCard({ election }: { election: ElectionWithEligibility }) {
-  const isActive = election.status === 'active'
-  const isClosed = election.status === 'closed'
-  const isUpcoming = election.status === 'draft'
+  const runtimeStatus = deriveElectionStatus(election.starts_at, election.ends_at)
+  const isActive = runtimeStatus === 'active'
+  const isClosed = runtimeStatus === 'closed'
+  const isUpcoming = runtimeStatus === 'draft'
   const liveCountdown = useLiveCountdown(isActive ? election.ends_at : undefined)
 
   return (
@@ -114,7 +126,7 @@ function ElectionCard({ election }: { election: ElectionWithEligibility }) {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant={isActive ? 'success' : isClosed ? 'default' : 'warning'}>
-                {election.status.charAt(0).toUpperCase() + election.status.slice(1)}
+                {runtimeStatus.charAt(0).toUpperCase() + runtimeStatus.slice(1)}
               </Badge>
               {election.require_index_number && (
                 <span className="flex items-center gap-1 text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">

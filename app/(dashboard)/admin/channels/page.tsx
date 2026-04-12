@@ -13,6 +13,7 @@ import { uploadFile } from '@/lib/utils/uploadFile'
 import type { Database } from '@/types/database'
 
 type ChannelType = 'public' | 'private' | 'announcement'
+const PAGE_SIZE = 50
 
 const TYPE_ICONS: Record<ChannelType, React.ReactNode> = {
   public: <Hash size={14} />,
@@ -46,18 +47,29 @@ export default function AdminChannelsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [uploadingBanner, setUploadingBanner] = useState(false)
+  const [channelsPage, setChannelsPage] = useState(1)
 
-  const { data: channels = [], isLoading } = useQuery({
-    queryKey: ['admin-channels'],
+  const { data: channelsResult, isLoading } = useQuery({
+    queryKey: ['admin-channels', channelsPage],
     queryFn: async () => {
       const supabase = createClient()
-      const { data } = await supabase
+      const from = (channelsPage - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+      const { data, count, error } = await supabase
         .from('channels')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-      return data ?? []
+        .range(from, to)
+      if (error) throw error
+      return {
+        rows: data ?? [],
+        total: count ?? 0,
+      }
     },
   })
+  const channels = channelsResult?.rows ?? []
+  const channelsTotal = channelsResult?.total ?? 0
+  const channelsTotalPages = Math.max(1, Math.ceil(channelsTotal / PAGE_SIZE))
 
   type JoinRequest = Database['public']['Tables']['channel_join_requests']['Row'] & {
     channel: { id: string; name: string }
@@ -538,6 +550,25 @@ export default function AdminChannelsPage() {
               </div>
             )
           })}
+          <div className="flex items-center justify-between border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl px-4 py-3">
+            <p className="text-xs text-slate-500">Page {channelsPage} of {channelsTotalPages}</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setChannelsPage((p) => Math.max(1, p - 1))}
+                disabled={channelsPage <= 1}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setChannelsPage((p) => Math.min(channelsTotalPages, p + 1))}
+                disabled={channelsPage >= channelsTotalPages}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600 text-white disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

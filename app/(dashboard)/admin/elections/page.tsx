@@ -10,12 +10,23 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { Badge } from '@/components/shared/Badge'
 import { Avatar } from '@/components/shared/Avatar'
-import { Plus, Loader2, Trash2, Users, ChevronDown, ChevronUp, Camera, Search, ShieldCheck, ClipboardList, X, Vote } from 'lucide-react'
+import { Plus, Loader2, Trash2, Users, ChevronDown, ChevronUp, Camera, Search, ShieldCheck, ClipboardList, X } from 'lucide-react'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { formatEventDate } from '@/lib/utils/formatDate'
 import type { Election, CandidateWithProfile } from '@/types/app'
 
 const LEVELS = ['100', '200', '300', '400', 'postgrad'] as const
+
+type RuntimeElectionStatus = 'draft' | 'active' | 'closed'
+
+function deriveElectionStatus(startsAt: string, endsAt: string): RuntimeElectionStatus {
+  const now = Date.now()
+  const starts = new Date(startsAt).getTime()
+  const ends = new Date(endsAt).getTime()
+  if (now < starts) return 'draft'
+  if (now >= ends) return 'closed'
+  return 'active'
+}
 
 const schema = z.object({
   title: z.string().min(3),
@@ -35,12 +46,12 @@ type ResolvedProfile = {
 }
 
 // ── Voter Roll panel ──────────────────────────────────────────────────────────
-type VoterRollRow = { id: string; student_id: string; full_name: string; voter_id: string | null }
+type VoterRollRow = { id: string; student_id: string; full_name: string | null; voter_id: string | null }
 
 function VoterRollPanel({ electionId }: { electionId: string }) {
   const { confirm } = useDialog()
   const [rawText, setRawText] = useState('')
-  const [parsed, setParsed] = useState<{ student_id: string; full_name: string }[]>([])
+  const [parsed, setParsed] = useState<{ student_id: string; full_name: string | null }[]>([])
   const [parseError, setParseError] = useState('')
   const [importing, setImporting] = useState(false)
   const [clearing, setClearing] = useState(false)
@@ -61,16 +72,17 @@ function VoterRollPanel({ electionId }: { electionId: string }) {
   function parsePaste() {
     setParseError('')
     const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean)
-    const entries: { student_id: string; full_name: string }[] = []
+    const entries: { student_id: string; full_name: string | null }[] = []
     const errors: string[] = []
     lines.forEach((line, i) => {
       // Support comma or tab as delimiter
       const parts = line.split(/[,\t]/).map((p) => p.trim())
-      if (parts.length < 2 || !parts[0] || !parts[1]) {
-        errors.push(`Line ${i + 1}: expected "STUDENT_ID, Full Name" — got "${line}"`)
+      if (!parts[0]) {
+        errors.push(`Line ${i + 1}: missing student ID — got "${line}"`)
         return
       }
-      entries.push({ student_id: parts[0].toUpperCase(), full_name: parts.slice(1).join(' ') })
+      const maybeName = parts.length > 1 ? parts.slice(1).join(' ').trim() : ''
+      entries.push({ student_id: parts[0].toUpperCase(), full_name: maybeName || null })
     })
     if (errors.length) { setParseError(errors.slice(0, 3).join('\n') + (errors.length > 3 ? `\n…and ${errors.length - 3} more` : '')); return }
     setParsed(entries)
@@ -143,12 +155,12 @@ function VoterRollPanel({ electionId }: { electionId: string }) {
           Import voter list
         </p>
         <p className="text-xs text-slate-400">
-          One student per line: <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[10px]">STUDENT_ID, Full Name</code> or tab-separated.
+          One student per line: <code className="bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[10px]">STUDENT_ID</code>. Name is optional after comma/tab.
         </p>
         <textarea
           value={rawText}
           onChange={(e) => { setRawText(e.target.value); setParsed([]); setParseError('') }}
-          placeholder={"CS/2020/001, John Kwame Doe\nCS/2020/002, Alice Mensah\n10201234, Bob Asante"}
+          placeholder={"CS/2020/001\nCS/2020/002, Alice Mensah\n10201234"}
           rows={5}
           className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-violet-500 resize-y"
         />
@@ -169,7 +181,7 @@ function VoterRollPanel({ electionId }: { electionId: string }) {
               {parsed.slice(0, 50).map((p, i) => (
                 <div key={i} className="flex items-center gap-3 px-3 py-1.5 min-w-0">
                   <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 shrink-0">{p.student_id}</span>
-                  <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{p.full_name}</span>
+                  <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{p.full_name ?? 'No name provided'}</span>
                 </div>
               ))}
               {parsed.length > 50 && (
@@ -209,7 +221,7 @@ function VoterRollPanel({ electionId }: { electionId: string }) {
             {rolls.map((r) => (
               <div key={r.id} className="flex items-center gap-3 px-3 py-2 min-w-0">
                 <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 shrink-0 w-24 truncate">{r.student_id}</span>
-                <span className="text-xs text-slate-700 dark:text-slate-300 flex-1 truncate">{r.full_name}</span>
+                <span className="text-xs text-slate-700 dark:text-slate-300 flex-1 truncate">{r.full_name ?? 'No name provided'}</span>
                 {r.voter_id
                   ? <span className="text-[10px] text-green-600 font-medium shrink-0">✓ verified</span>
                   : <span className="text-[10px] text-slate-400 shrink-0">pending</span>
@@ -545,14 +557,6 @@ export default function AdminElectionsPage() {
     onError: () => toast.error('Failed to create election'),
   })
 
-  const { mutate: changeStatus } = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'draft' | 'active' | 'closed' }) => {
-      const supabase = createClient()
-      await supabase.from('elections').update({ status }).eq('id', id)
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-elections'] }),
-  })
-
   const { mutate: deleteElection } = useMutation({
     mutationFn: async (id: string) => {
       const supabase = createClient()
@@ -562,9 +566,9 @@ export default function AdminElectionsPage() {
   })
 
   const electionList = elections ?? []
-  const draftCount = electionList.filter((e) => e.status === 'draft').length
-  const activeCount = electionList.filter((e) => e.status === 'active').length
-  const closedCount = electionList.filter((e) => e.status === 'closed').length
+  const draftCount = electionList.filter((e) => deriveElectionStatus(e.starts_at, e.ends_at) === 'draft').length
+  const activeCount = electionList.filter((e) => deriveElectionStatus(e.starts_at, e.ends_at) === 'active').length
+  const closedCount = electionList.filter((e) => deriveElectionStatus(e.starts_at, e.ends_at) === 'closed').length
 
   return (
     <div className="space-y-6">
@@ -573,6 +577,7 @@ export default function AdminElectionsPage() {
           <div>
             <h2 className="text-2xl font-semibold text-white">Election Command</h2>
             <p className="mt-1 text-sm text-slate-300">Create ballots, configure eligibility, and monitor campaign flow.</p>
+            <p className="mt-1 text-xs text-cyan-200">Status is computed automatically from start/end timestamps.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">Draft: {draftCount}</span>
@@ -704,15 +709,16 @@ export default function AdminElectionsPage() {
       <div className="space-y-3">
         {elections?.map((e) => {
           const el = e as Election & { require_index_number?: boolean; eligible_levels?: string[] | null }
+          const runtimeStatus = deriveElectionStatus(el.starts_at, el.ends_at)
           return (
             <div key={el.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <Badge variant={el.status === 'active' ? 'success' : el.status === 'closed' ? 'default' : 'warning'}>
-                      {el.status}
+                    <Badge variant={runtimeStatus === 'active' ? 'success' : runtimeStatus === 'closed' ? 'default' : 'warning'}>
+                      {runtimeStatus}
                     </Badge>
-                    {el.status === 'active' && (
+                    {runtimeStatus === 'active' && (
                       <span className="flex items-center gap-1 text-[10px] font-bold bg-green-500 text-white px-2 py-0.5 rounded-full animate-pulse">
                         ● VOTING LIVE
                       </span>
@@ -750,30 +756,6 @@ export default function AdminElectionsPage() {
                     Voter Roll
                     {voterRollId === el.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   </button>
-                  {el.status === 'draft' && (
-                    <button
-                      onClick={() => changeStatus({ id: el.id, status: 'active' })}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-semibold transition"
-                    >
-                      <Vote size={12} /> Enable Voting
-                    </button>
-                  )}
-                  {el.status === 'active' && (
-                    <button
-                      onClick={() => changeStatus({ id: el.id, status: 'closed' })}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 text-xs font-semibold transition"
-                    >
-                      <Vote size={12} /> Stop Voting
-                    </button>
-                  )}
-                  {el.status === 'closed' && (
-                    <button
-                      onClick={() => changeStatus({ id: el.id, status: 'active' })}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-semibold transition"
-                    >
-                      <Vote size={12} /> Reopen
-                    </button>
-                  )}
                   <button
                     onClick={() => deleteElection(el.id)}
                     className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition"

@@ -256,14 +256,32 @@ export interface Database {
           id: string
           election_id: string
           candidate_id: string
-          voter_id: string
+          ballot_id: string
           created_at: string
         }
         Insert: {
           id?: string
           election_id: string
           candidate_id: string
+          ballot_id: string
+          created_at?: string
+        }
+        Update: never
+        Relationships: []
+      }
+      election_vote_receipts: {
+        Row: {
+          id: string
+          election_id: string
           voter_id: string
+          receipt_code: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          election_id: string
+          voter_id: string
+          receipt_code: string
           created_at?: string
         }
         Update: never
@@ -274,7 +292,7 @@ export interface Database {
           id: string
           election_id: string
           student_id: string
-          full_name: string
+          full_name: string | null
           voter_id: string | null
           created_at: string
         }
@@ -282,11 +300,12 @@ export interface Database {
           id?: string
           election_id: string
           student_id: string
-          full_name: string
+          full_name?: string | null
           voter_id?: string | null
           created_at?: string
         }
         Update: {
+          full_name?: string | null
           voter_id?: string | null
         }
         Relationships: []
@@ -690,17 +709,23 @@ export interface Database {
       verify_voter: {
         Args: {
           p_election_id: string
-          p_student_id:  string
-          p_user_id:     string
+          p_student_id: string
         }
-        Returns: { ok: boolean; error?: string; name?: string }
+        Returns: { ok: boolean; error?: string; student_id?: string }
       }
       cast_ballot: {
         Args: {
           p_election_id: string
           p_candidate_ids: string[]
         }
-        Returns: { ok: boolean; error?: string; count?: number }
+        Returns: { ok: boolean; error?: string; count?: number; receipt_code?: string }
+      }
+      election_runtime_status: {
+        Args: {
+          p_starts_at: string
+          p_ends_at: string
+        }
+        Returns: string
       }
       request_channel_join: {
         Args: {
@@ -829,6 +854,34 @@ export interface Database {
           p_details?: Json
         }
         Returns: string
+      }
+      admin_set_user_role: {
+        Args: {
+          p_target_user_id: string
+          p_new_role: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      admin_set_user_ban: {
+        Args: {
+          p_target_user_id: string
+          p_is_banned: boolean
+          p_ban_reason?: string | null
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      admin_set_post_report_status: {
+        Args: {
+          p_report_id: string
+          p_status: string
+        }
+        Returns: { ok: boolean; error?: string }
+      }
+      admin_delete_post_report: {
+        Args: {
+          p_report_id: string
+        }
+        Returns: { ok: boolean; error?: string }
       }
     }
     Enums: Record<string, never>
