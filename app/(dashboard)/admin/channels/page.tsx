@@ -39,6 +39,8 @@ export default function AdminChannelsPage() {
     private_join_mode: 'approval' as 'approval' | 'code',
     private_entry_code: '',
     avatar_url: '' as string | null,
+    emoji_icon: '' as string | null,
+    color_hex: '#7c3aed',
     banner_url: '' as string | null,
   })
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -155,6 +157,8 @@ export default function AdminChannelsPage() {
       private_join_mode: (ch.private_join_mode ?? 'approval') as 'approval' | 'code',
       private_entry_code: ch.private_entry_code ?? '',
       avatar_url: ch.avatar_url ?? '',
+      emoji_icon: ch.emoji_icon ?? '',
+      color_hex: ch.color_hex ?? '#7c3aed',
       banner_url: ch.banner_url ?? '',
     })
     setShowForm(true)
@@ -164,7 +168,7 @@ export default function AdminChannelsPage() {
   function cancelForm() {
     setShowForm(false)
     setEditingId(null)
-    setForm({ name: '', description: '', type: 'public', private_join_mode: 'approval', private_entry_code: '', avatar_url: '', banner_url: '' })
+    setForm({ name: '', description: '', type: 'public', private_join_mode: 'approval', private_entry_code: '', avatar_url: '', emoji_icon: '', color_hex: '#7c3aed', banner_url: '' })
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -177,6 +181,8 @@ export default function AdminChannelsPage() {
           p_channel_id: editingId,
           p_description: form.description.trim() || null,
           p_avatar_url: form.avatar_url || null,
+          p_emoji_icon: form.emoji_icon || null,
+          p_color_hex: form.color_hex || '#7c3aed',
           p_banner_url: form.banner_url || null,
         })
         if (error) throw error
@@ -206,6 +212,8 @@ export default function AdminChannelsPage() {
           ? (form.private_entry_code.trim() || null)
           : null,
         avatar_url: form.avatar_url || null,
+        emoji_icon: form.emoji_icon || null,
+        color_hex: form.color_hex || '#7c3aed',
         banner_url: form.banner_url || null,
         created_by: user!.id,
       }).select('id').single()
@@ -359,13 +367,16 @@ export default function AdminChannelsPage() {
                 channelId={editingId || 'new'}
                 channelName={form.name || 'channel'}
                 currentAvatar={form.avatar_url ?? undefined}
-                currentEmoji={undefined}
-                currentColor="#7c3aed"
+                currentEmoji={form.emoji_icon ?? undefined}
+                currentColor={form.color_hex || '#7c3aed'}
                 isAdmin={true}
                 onUpdate={async (data) => {
-                  if (data.avatar_url !== undefined) {
-                    setForm(prev => ({ ...prev, avatar_url: data.avatar_url ?? null }))
-                  }
+                  setForm((prev) => ({
+                    ...prev,
+                    avatar_url: data.avatar_url !== undefined ? (data.avatar_url ?? null) : prev.avatar_url,
+                    emoji_icon: data.emoji_icon !== undefined ? (data.emoji_icon ?? null) : prev.emoji_icon,
+                    color_hex: data.color_hex !== undefined ? data.color_hex : prev.color_hex,
+                  }))
                 }}
               />
             </div>
