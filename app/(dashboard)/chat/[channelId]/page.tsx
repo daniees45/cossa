@@ -792,7 +792,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
   return (
     <div
-      className="flex min-h-0 h-full flex-col pb-[calc(4.6rem+env(safe-area-inset-bottom))] md:pb-0"
+      className="flex min-h-0 h-full flex-col overflow-hidden"
       onClick={() => { setPickerFor(null); setMobileActionFor(null) }}
       style={{ backgroundColor: panelBg }}
     >
@@ -1088,7 +1088,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 pb-[calc(4.6rem+env(safe-area-inset-bottom))] md:pb-0"
         style={{ backgroundColor: channel?.banner_url ? hexToRgba(themeColor, 0.04) : undefined }}
       >
         {hasMore && (

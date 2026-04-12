@@ -680,7 +680,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const isMutedDm = mutedDms.includes(userId)
 
   return (
-    <div className="flex min-h-0 h-full flex-col pb-[calc(4.6rem+env(safe-area-inset-bottom))] md:pb-0" onClick={() => { setPickerFor(null); setMobileActionFor(null) }}>
+    <div className="flex min-h-0 h-full flex-col overflow-hidden" onClick={() => { setPickerFor(null); setMobileActionFor(null) }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur">
         <Link href="/chat" className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -844,7 +844,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.05),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.12),transparent_45%)]">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 sm:px-4 lg:px-6 py-3 sm:py-4 space-y-1 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.05),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.12),transparent_45%)] pb-[calc(4.6rem+env(safe-area-inset-bottom))] md:pb-0">
         {hasMore && (
           <div className="flex justify-center pb-2">
             <button
