@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -11,11 +12,13 @@ import {
   Flag,
   Gavel,
   LayoutDashboard,
+  Menu,
   Megaphone,
   MessageSquareLock,
   Trophy,
   Users,
 } from 'lucide-react'
+import { MobileSlideOver } from '@/components/shared/MobileSlideOver'
 import type { LucideIcon } from 'lucide-react'
 
 type NavItem = {
@@ -45,15 +48,16 @@ function isActive(pathname: string, href: string) {
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
-    <div className="relative min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="relative min-h-dvh bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 -left-10 h-72 w-72 rounded-full bg-cyan-500/15 blur-3xl dark:bg-cyan-500/20" />
         <div className="absolute top-1/3 -right-16 h-80 w-80 rounded-full bg-emerald-500/15 blur-3xl dark:bg-emerald-500/20" />
       </div>
 
-      <div className="relative mx-auto grid min-h-screen w-full max-w-[1400px] grid-cols-1 gap-6 px-3 pb-8 pt-4 md:px-5 lg:grid-cols-[260px_1fr] lg:gap-8 lg:px-8 lg:py-8">
+      <div className="relative mx-auto grid min-h-dvh w-full max-w-[1400px] grid-cols-1 gap-4 px-3 pb-24 pt-4 md:gap-6 md:px-5 lg:grid-cols-[260px_1fr] lg:gap-8 lg:px-8 lg:py-8 lg:pb-8">
         <aside className="hidden lg:flex lg:flex-col">
           <div className="sticky top-8 space-y-4 rounded-[28px] border border-slate-200/80 bg-white/70 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
             <div className="rounded-2xl border border-cyan-300/30 bg-cyan-500/10 p-4 dark:border-cyan-300/20">
@@ -87,7 +91,23 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
         <main className="min-w-0 space-y-4">
           <div className="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-white/5 lg:hidden">
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-200">Admin</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">Operations Deck</p>
+              </div>
+              <button
+                onClick={() => setMobileNavOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              >
+                <Menu size={16} />
+                Menu
+              </button>
+            </div>
+          </div>
+
+          <MobileSlideOver open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} title="Admin menu">
+            <div className="space-y-1 p-3">
               {ADMIN_NAV.map((item) => {
                 const active = isActive(pathname, item.href)
                 const Icon = item.icon
@@ -95,21 +115,20 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                    onClick={() => setMobileNavOpen(false)}
+                    className={`flex items-center gap-2.5 rounded-xl px-3 py-3 text-sm transition ${
                       active
-                        ? 'bg-cyan-500/15 text-cyan-700 dark:bg-cyan-400/25 dark:text-cyan-100'
-                        : 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300'
+                        ? 'bg-cyan-500/15 text-cyan-700 ring-1 ring-cyan-300/40 dark:bg-cyan-400/20 dark:text-cyan-100 dark:ring-cyan-300/30'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white'
                     }`}
                   >
-                    <span className="inline-flex items-center gap-1.5">
-                      <Icon size={13} />
-                      {item.label}
-                    </span>
+                    <Icon size={16} />
+                    {item.label}
                   </Link>
                 )
               })}
             </div>
-          </div>
+          </MobileSlideOver>
 
           <div className="admin-portal-skin rounded-[28px] border border-slate-200/80 bg-white/80 p-4 shadow-xl shadow-slate-300/25 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/70 dark:shadow-2xl dark:shadow-black/20 md:p-6">
             {children}

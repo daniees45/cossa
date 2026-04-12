@@ -278,20 +278,20 @@ export default function EntertainPage() {
   const filteredPast     = applyFilter(past)
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-5">
       <div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">Entertainment</h1>
         <p className="text-slate-500 text-sm mt-1">Events, activities, and media gallery</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
+      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 overflow-x-auto">
         {(['events', 'gallery'] as const).map((t) => (
           <button
             key={t}
             onClick={() => { setTab(t); setSearch('') }}
             className={cn(
-              'flex-1 py-2 rounded-lg text-sm font-medium transition',
+              'flex-1 min-w-[8.5rem] py-2 rounded-lg text-sm font-medium transition whitespace-nowrap',
               tab === t
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',

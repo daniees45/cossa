@@ -20,6 +20,7 @@ import Link from 'next/link'
 import { useChatStore } from '@/lib/stores/chatStore'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { Spinner } from '@/components/shared/Spinner'
+import { MobileSlideOver } from '@/components/shared/MobileSlideOver'
 import { toast } from 'sonner'
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥']
@@ -787,20 +788,10 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
 
       {/* Settings panel */}
       {showSettings && (
-        <div className="fixed inset-0 z-40 flex" onClick={() => setShowSettings(false)}>
-          <div className="flex-1" />
-          <div
-            className="w-80 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <>
+          <MobileSlideOver open={showSettings} onClose={() => setShowSettings(false)} title="Channel settings">
+            <div className="h-full bg-white dark:bg-slate-900 flex flex-col overflow-y-auto shadow-xl">
             {/* Panel header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800">
-              <p className="font-semibold text-slate-900 dark:text-white text-sm">Channel settings</p>
-              <button onClick={() => setShowSettings(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
-                <X size={15} />
-              </button>
-            </div>
-
             {/* Channel info */}
             <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
               <div className="mb-3">
@@ -979,14 +970,15 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                 Leave channel
               </button>
             </div>
-          </div>
-        </div>
+            </div>
+          </MobileSlideOver>
+        </>
       )}
 
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-1"
+        className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-1"
         style={{ backgroundColor: channel?.banner_url ? hexToRgba(themeColor, 0.04) : undefined }}
       >
         {hasMore && (
@@ -1050,7 +1042,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
                 <div className="w-7 shrink-0" />
               )}
 
-              <div className={cn('max-w-[70%]', isOwn && 'items-end flex flex-col')}>
+              <div className={cn('max-w-[85%] sm:max-w-[70%]', isOwn && 'items-end flex flex-col')}>
                 {!grouped && (
                   <p className="text-xs text-slate-400 mb-1 px-1">
                     {isOwn ? 'You' : msg.sender.full_name}
@@ -1260,7 +1252,7 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       <form
         ref={formRef}
         onSubmit={sendMessage}
-        className="flex items-end gap-2 px-4 py-3 border-t dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
+        className="flex items-end gap-2 px-3 sm:px-4 py-3 border-t dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0"
         style={{ borderColor: panelBorder, backgroundColor: hexToRgba(themeColor, 0.05) }}
       >
         <input

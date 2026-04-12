@@ -59,7 +59,7 @@ export default async function PostPage({ params }: Props) {
   const post = { ...(data as unknown as Record<string, unknown>), liked_by_me } as unknown as PostWithAuthor
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
       <Link
         href="/"
         className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 mb-5 transition-colors"
@@ -114,7 +114,7 @@ async function Comments({ postId, currentUserId }: { postId: string; currentUser
       {comments.map((comment) => {
         const author = comment.author
         return (
-          <li key={comment.id} className="px-5 py-4 flex gap-3">
+          <li key={comment.id} className="px-4 sm:px-5 py-4 flex gap-3">
             <div className="w-8 h-8 rounded-full bg-violet-100 dark:bg-violet-900 flex items-center justify-center text-xs font-bold text-violet-700 dark:text-violet-300 shrink-0 overflow-hidden">
               {author?.avatar_url ? (
                 <img src={author.avatar_url} alt={author.full_name} className="w-full h-full object-cover" />

@@ -87,7 +87,7 @@ export function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex items-center h-14 px-4 md:px-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 gap-3">
+    <header className="sticky top-0 z-40 flex items-center h-14 px-3 sm:px-4 md:px-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 gap-2 sm:gap-3">
       {/* COSSA logo - mobile only */}
       <div className="md:hidden flex items-center gap-2 mr-2">
         <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
@@ -108,7 +108,14 @@ export function Topbar() {
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="sm:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-500 dark:text-slate-400"
+          title="Search"
+        >
+          <Search size={18} />
+        </button>
         {/* Dark mode toggle */}
         <ThemeToggle />
         {/* Notification Bell */}
@@ -126,7 +133,7 @@ export function Topbar() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-12 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
+            <div className="absolute right-0 top-12 w-[min(20rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</p>
                 {unreadCount > 0 && (

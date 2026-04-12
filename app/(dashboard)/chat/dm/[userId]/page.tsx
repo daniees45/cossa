@@ -19,6 +19,7 @@ import Link from 'next/link'
 import { useChatStore } from '@/lib/stores/chatStore'
 import { useDialog } from '@/components/shared/DialogProvider'
 import { Spinner } from '@/components/shared/Spinner'
+import { MobileSlideOver } from '@/components/shared/MobileSlideOver'
 import {
   ensureKeyPair,
   encryptMessage,
@@ -662,20 +663,10 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
       {/* Settings panel */}
       {showSettings && (
-        <div className="fixed inset-0 z-40 flex" onClick={() => setShowSettings(false)}>
-          <div className="flex-1" />
-          <div
-            className="w-80 h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <>
+          <MobileSlideOver open={showSettings} onClose={() => setShowSettings(false)} title="Conversation info">
+            <div className="h-full bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto shadow-xl">
             {/* Panel header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800">
-              <p className="font-semibold text-slate-900 dark:text-white text-sm">Conversation info</p>
-              <button onClick={() => setShowSettings(false)} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
-                <X size={15} />
-              </button>
-            </div>
-
             {/* User info */}
             <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-col items-center text-center">
               <Avatar src={other?.avatar_url ?? null} name={other?.full_name ?? ''} size="lg" className="mb-2" />
@@ -737,12 +728,13 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 Clear conversation
               </button>
             </div>
-          </div>
-        </div>
+            </div>
+          </MobileSlideOver>
+        </>
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-1">
         {hasMore && (
           <div className="flex justify-center pb-2">
             <button
@@ -807,7 +799,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
                 <div className="w-7 shrink-0" />
               )}
 
-              <div className={cn('max-w-[70%]', isOwn ? 'items-end flex flex-col' : '')}>
+              <div className={cn('max-w-[85%] sm:max-w-[70%]', isOwn ? 'items-end flex flex-col' : '')}>
                 {!grouped && (
                   <p className="text-xs text-slate-400 mb-1 px-1">
                     {isOwn ? 'You' : msg.sender.full_name}
@@ -816,7 +808,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
                 {/* Bubble / edit form */}
                 {editingId === msg.id ? (
-                  <form onSubmit={saveEdit} className="w-full min-w-[220px]">
+                  <form onSubmit={saveEdit} className="w-full min-w-0 sm:min-w-[220px]">
                     <textarea
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}

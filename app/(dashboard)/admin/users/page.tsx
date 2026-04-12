@@ -210,8 +210,8 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
+      <div className="flex flex-col items-stretch gap-3 sm:items-start lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 overflow-x-auto">
           <button
             onClick={() => setTab('users')}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${tab === 'users' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -232,7 +232,7 @@ export default function AdminUsersPage() {
         </div>
 
         {tab === 'users' && (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
             {(['all', 'banned', 'reported'] as const).map((f) => (
               <button
                 key={f}
@@ -248,7 +248,7 @@ export default function AdminUsersPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search name, username, index…"
-                className="pl-8 pr-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 w-56"
+                className="pl-8 pr-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 w-full sm:w-56"
               />
             </div>
           </div>

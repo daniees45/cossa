@@ -118,10 +118,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const isMe = me?.id === profile.id
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6">
       {/* Profile header */}
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
-        <div className="flex items-start gap-4">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
           <Avatar src={profile.avatar_url} name={profile.full_name} size="xl" />
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-slate-900 dark:text-white">{profile.full_name}</h1>
@@ -141,7 +141,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               </p>
             )}
             {/* Stats row */}
-            <div className="flex items-center gap-4 mt-2">
+            <div className="flex items-center gap-4 mt-2 flex-wrap">
               <div className="text-center">
                 <p className="text-sm font-bold text-slate-900 dark:text-white">{postCount ?? '—'}</p>
                 <p className="text-[10px] text-slate-400">Posts</p>
@@ -163,7 +163,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         )}
 
         {isMe && (
-          <div className="flex gap-2 mt-4">
+          <div className="flex flex-col sm:flex-row gap-2 mt-4">
             <button
               onClick={() => router.push('/profile/edit')}
               className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition"
@@ -189,7 +189,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         )}
 
         {!isMe && me && (
-          <div className="flex gap-3 mt-4">
+          <div className="flex flex-col sm:flex-row gap-3 mt-4">
             <button
               onClick={() => toggleFollow()}
               className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition flex items-center justify-center gap-2"

@@ -167,7 +167,7 @@ function VoterRollPanel({ electionId }: { electionId: string }) {
             </div>
             <div className="max-h-36 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
               {parsed.slice(0, 50).map((p, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-1.5">
+                <div key={i} className="flex items-center gap-3 px-3 py-1.5 min-w-0">
                   <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 shrink-0">{p.student_id}</span>
                   <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{p.full_name}</span>
                 </div>
@@ -178,7 +178,7 @@ function VoterRollPanel({ electionId }: { electionId: string }) {
             </div>
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
             type="button"
             onClick={parsePaste}
@@ -207,7 +207,7 @@ function VoterRollPanel({ electionId }: { electionId: string }) {
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Imported IDs ({rolls.length})</p>
           <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
             {rolls.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 px-3 py-2">
+              <div key={r.id} className="flex items-center gap-3 px-3 py-2 min-w-0">
                 <span className="text-[10px] font-mono text-violet-600 dark:text-violet-400 shrink-0 w-24 truncate">{r.student_id}</span>
                 <span className="text-xs text-slate-700 dark:text-slate-300 flex-1 truncate">{r.full_name}</span>
                 {r.voter_id
@@ -347,7 +347,7 @@ function CandidatePanel({ electionId }: { electionId: string }) {
       {candidates.length > 0 && (
         <div className="space-y-2">
           {candidates.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl px-3 py-2">
+            <div key={c.id} className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl px-3 py-2 min-w-0">
               <Avatar src={c.photo_url ?? c.profile.avatar_url} name={c.profile.full_name} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-slate-900 dark:text-white">{c.profile.full_name}</p>
@@ -377,7 +377,7 @@ function CandidatePanel({ electionId }: { electionId: string }) {
           {/* Username lookup */}
           <div>
             <label className="block text-xs text-slate-500 mb-1">Username *</label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={form.username}
                 onChange={(e) => { setForm({ ...form, username: e.target.value }); setResolvedProfile(null) }}
@@ -415,7 +415,7 @@ function CandidatePanel({ electionId }: { electionId: string }) {
           )}
 
           {/* Photo */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="relative w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex items-center justify-center shrink-0">
               {photoPreview
                 ? <img src={photoPreview} alt="" className="w-full h-full object-cover" />
@@ -463,7 +463,7 @@ function CandidatePanel({ electionId }: { electionId: string }) {
             <p className="text-[10px] text-slate-400 mt-0.5 text-right">{form.manifesto.length} chars</p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="submit"
               disabled={submitting || !resolvedProfile}

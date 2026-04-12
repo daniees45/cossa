@@ -41,7 +41,7 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
 
   if (election && election.status !== 'closed' && !isAdmin) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-20 flex flex-col items-center gap-4 text-center">
+      <div className="max-w-2xl mx-auto px-3 sm:px-4 py-16 sm:py-20 flex flex-col items-center gap-4 text-center">
         <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
           <Lock size={24} className="text-amber-500" />
         </div>
@@ -54,7 +54,7 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-8">
       <div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">{election?.title} — Results</h1>
         <p className="text-slate-500 text-sm mt-1">
@@ -81,7 +81,7 @@ export default function ElectionResultsPage({ params }: { params: Promise<{ id: 
 
             {/* Winner */}
             {winner && (
-              <div className="flex items-center gap-4 px-5 py-4 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800">
                 <div className="relative">
                   <Avatar src={winner.profile.avatar_url} name={winner.profile.full_name} size="lg" />
                   <Trophy size={14} className="absolute -bottom-1 -right-1 text-amber-500" />

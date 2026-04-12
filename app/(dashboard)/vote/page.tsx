@@ -33,7 +33,7 @@ export default function VotePage() {
   const closed = elections?.filter((e) => e.status === 'closed') ?? []
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-8">
       <div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">Elections</h1>
         <p className="text-slate-500 text-sm mt-1">Cast your vote for COSSA leadership</p>

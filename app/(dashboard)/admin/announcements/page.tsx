@@ -107,14 +107,14 @@ export default function AdminAnnouncementsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Announcements</h1>
           <p className="text-sm text-slate-500 mt-0.5">Publish news, academic updates, and urgent notices</p>
         </div>
         <button
           onClick={() => { cancelForm(); setShowForm(!showForm) }}
-          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+          className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors w-full sm:w-auto"
         >
           <Plus size={16} />
           New Announcement
@@ -176,7 +176,7 @@ export default function AdminAnnouncementsPage() {
             </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
             <button
               type="submit"
               disabled={submitting}
@@ -215,7 +215,7 @@ export default function AdminAnnouncementsPage() {
                 key={ann.id}
                 className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       {ann.pinned && (
@@ -231,7 +231,7 @@ export default function AdminAnnouncementsPage() {
                     <h3 className="font-semibold text-slate-900 dark:text-white">{ann.title}</h3>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{ann.body}</p>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center flex-wrap gap-1 shrink-0 sm:justify-end">
                     <button
                       onClick={() => startEdit(ann)}
                       title="Edit"

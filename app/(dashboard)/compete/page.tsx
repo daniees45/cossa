@@ -38,7 +38,7 @@ export default function CompetePage() {
   const ended = competitions?.filter((c) => c.status === 'ended') ?? []
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
+    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-8">
       <div>
         <h1 className="text-xl font-bold text-slate-900 dark:text-white">Competitions</h1>
         <p className="text-slate-500 text-sm mt-1">Hackathons, quizzes, and coding challenges</p>
@@ -80,7 +80,7 @@ function CompSection({ title, items }: { title: string; items: Competition[] }) 
             href={`/compete/${c.id}`}
             className="block bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 hover:border-violet-300 dark:hover:border-violet-700 transition"
           >
-            <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <Badge variant={statusVariant[c.status]}>

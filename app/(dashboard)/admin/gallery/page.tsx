@@ -83,7 +83,7 @@ export default function AdminGalleryPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Gallery</h1>
           <p className="text-sm text-slate-500 mt-0.5">Manage photos shown in the Entertainment gallery</p>
@@ -91,7 +91,7 @@ export default function AdminGalleryPage() {
         <button
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+          className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors w-full sm:w-auto"
         >
           {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
           {uploading ? 'Uploading…' : 'Upload Photos'}
@@ -107,7 +107,7 @@ export default function AdminGalleryPage() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="aspect-square rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
           ))}
@@ -124,7 +124,7 @@ export default function AdminGalleryPage() {
       ) : (
         <>
           <p className="text-xs text-slate-400">{photos.length} photo{photos.length !== 1 ? 's' : ''}</p>
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {photos.map((photo) => (
               <div key={photo.name} className="group relative aspect-square rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800">
                 <img

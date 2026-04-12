@@ -158,14 +158,14 @@ export default function AdminCompetitionsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Competitions</h1>
           <p className="text-sm text-slate-500 mt-0.5">Manage hackathons, quizzes, and coding challenges</p>
         </div>
         <button
           onClick={() => { cancelForm(); setShowForm(!showForm); setScoringCompId(null) }}
-          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+          className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors w-full sm:w-auto"
         >
           <Plus size={16} />
           New Competition
@@ -283,7 +283,7 @@ export default function AdminCompetitionsPage() {
             />
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
             <button
               type="submit"
               disabled={submitting}
@@ -306,7 +306,7 @@ export default function AdminCompetitionsPage() {
       {/* Scoring Panel */}
       {scoringCompId && scoringComp && (
         <div className="bg-white dark:bg-slate-800 border border-violet-300 dark:border-violet-700 rounded-2xl p-6 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
               <Star size={18} className="text-yellow-500" />
               Scoring: {scoringComp.title}
@@ -353,7 +353,7 @@ export default function AdminCompetitionsPage() {
         <div className="space-y-3">
           {competitions.map((comp) => (
             <div key={comp.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize ${STATUS_COLORS[comp.status as Status]}`}>
@@ -369,7 +369,7 @@ export default function AdminCompetitionsPage() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                <div className="flex items-center gap-1 shrink-0 flex-wrap sm:justify-end">
                   {/* Status transitions */}
                   {comp.status === 'upcoming' && (
                     <button

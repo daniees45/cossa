@@ -194,7 +194,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
   // ── Voter roll verification gate ────────────────────────────────────────────
   if (needsVerification && rollCount !== undefined && preVerified !== undefined) {
     return (
-      <div className="max-w-md mx-auto px-4 py-10 space-y-6">
+      <div className="max-w-md mx-auto px-3 sm:px-4 py-8 sm:py-10 space-y-6">
         <div className="text-center">
           <div className="w-14 h-14 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mx-auto mb-4">
             <KeyRound size={26} className="text-violet-600" />
@@ -263,7 +263,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
 
   if (eligibilityError) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-12 sm:py-16 text-center">
         <ShieldX size={48} className="text-red-400 mx-auto mb-4" />
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Not eligible to vote</h2>
         <p className="text-slate-500 text-sm mb-6">{eligibilityError}</p>
@@ -288,7 +288,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
 
   if (hasVoted) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-8 sm:py-10 space-y-6">
         <div className="text-center">
           <CheckCircle2 size={52} className="text-green-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">You&apos;ve already voted</h2>
@@ -320,7 +320,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
           </div>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <Link
             href="/vote"
             className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium text-slate-700 dark:text-slate-300 text-center hover:bg-slate-50 dark:hover:bg-slate-700 transition"
@@ -339,7 +339,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 pb-10 space-y-6">
+    <div className="max-w-lg mx-auto px-3 sm:px-4 pb-10 space-y-6">
       {/* Election header */}
       {election && (
         <div className="pt-6">
@@ -396,7 +396,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                   key={candidate.id}
                   onClick={() => setSelected({ ...selected, [position]: candidate.id })}
                   className={cn(
-                    'w-full text-left flex items-start gap-4 p-4 rounded-2xl border-2 transition',
+                    'w-full text-left flex flex-col sm:flex-row items-start gap-4 p-4 rounded-2xl border-2 transition',
                     isSelected
                       ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
                       : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-violet-300'
@@ -487,7 +487,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
                 )
               })}
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={() => setConfirming(false)}
                 className="py-3 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
@@ -509,7 +509,7 @@ export default function VoteBallotPage({ params }: { params: Promise<{ electionI
 
       {/* Full manifesto modal */}
       {manifestoCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-3 sm:px-4 pb-4 sm:pb-0">
           <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-700">
               <Avatar

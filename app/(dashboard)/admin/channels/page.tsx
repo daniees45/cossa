@@ -241,14 +241,14 @@ export default function AdminChannelsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Channels</h1>
           <p className="text-sm text-slate-500 mt-0.5">Manage public chat channels</p>
         </div>
         <button
           onClick={() => { cancelForm(); setShowForm(!showForm) }}
-          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+          className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors w-full sm:w-auto"
         >
           <Plus size={16} />
           New Channel
@@ -490,9 +490,9 @@ export default function AdminChannelsPage() {
             return (
               <div
                 key={ch.id}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 flex items-center justify-between gap-3"
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 w-full">
                   <ChannelAvatar
                     name={ch.name}
                     avatar_url={ch.avatar_url}
@@ -509,7 +509,7 @@ export default function AdminChannelsPage() {
                     <p className="text-xs text-slate-400">{formatDate(ch.created_at)}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center flex-wrap gap-2 shrink-0 w-full sm:w-auto sm:justify-end">
                   {type === 'private' && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 capitalize">
                       {ch.private_join_mode ?? 'approval'}

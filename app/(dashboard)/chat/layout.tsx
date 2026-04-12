@@ -244,17 +244,17 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full min-h-0">
       {/* Channel list sidebar */}
       <div className={cn(
-        'w-full md:w-64 md:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0',
+        'w-full md:w-64 md:border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 min-h-0',
         pathname !== '/chat' && 'hidden md:flex'
       )}>
         <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800">
           <h2 className="font-semibold text-slate-900 dark:text-white text-sm">Messages</h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto py-2 min-h-0">
           {/* Channels */}
           <div className="px-3 mb-2">
             <div className="mb-1 px-2 flex items-center justify-between">
@@ -402,7 +402,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           aria-labelledby="join-dialog-title"
         >
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setJoinPreview(null)} />
-          <div className="relative z-10 w-full max-w-sm mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <div className="relative z-10 w-full max-w-sm mx-3 sm:mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <div className="px-6 pt-6 pb-4">
               <div className="mb-4">
                 <ChannelAvatar
@@ -451,7 +451,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                 </div>
               )}
             </div>
-            <div className="flex gap-2 px-6 pb-5 justify-end">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 px-6 pb-5 justify-end">
               <button
                 onClick={() => setJoinPreview(null)}
                 className="px-4 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
@@ -478,7 +478,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowCreateRequest(false)} />
           <form
             onSubmit={submitChannelRequest}
-            className="relative z-10 w-full max-w-md mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+            className="relative z-10 w-full max-w-md mx-3 sm:mx-4 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden max-h-[calc(100dvh-2rem)] overflow-y-auto"
           >
             <div className="px-6 pt-6 pb-4 space-y-3">
               <h2 id="create-channel-request-title" className="text-base font-semibold text-slate-900 dark:text-white">
@@ -560,7 +560,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               )}
             </div>
 
-            <div className="flex gap-2 px-6 pb-5 justify-end">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 px-6 pb-5 justify-end">
               <button
                 type="button"
                 onClick={() => setShowCreateRequest(false)}

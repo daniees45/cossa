@@ -117,7 +117,7 @@ export default function AdminAuditPage() {
       </div>
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -130,7 +130,7 @@ export default function AdminAuditPage() {
           <button
             onClick={exportCsv}
             disabled={filteredLogs.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-50 w-full sm:w-auto"
           >
             <Download size={14} />
             CSV
@@ -181,7 +181,7 @@ export default function AdminAuditPage() {
         <div className="space-y-2">
           {filteredLogs.map((log) => (
             <div key={log.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <Avatar src={log.actor?.avatar_url ?? null} name={log.actor?.full_name ?? 'Admin'} size="sm" />
                   <div className="min-w-0">

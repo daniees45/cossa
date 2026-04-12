@@ -126,8 +126,8 @@ export default function FeedPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-6">
-      <div className="flex gap-6 items-start">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <div className="flex flex-col gap-4 md:gap-6 items-start">
         {/* Main feed column */}
         <div className="flex-1 min-w-0 space-y-4" ref={feedTopRef}>
 
@@ -153,13 +153,13 @@ export default function FeedPage() {
           )}
 
           {/* Feed tabs */}
-          <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+          <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setMode(tab.id)}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition',
+                  'min-w-fit flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition whitespace-nowrap',
                   mode === tab.id
                     ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200',

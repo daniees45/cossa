@@ -105,7 +105,7 @@ export default function AdminNotificationsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Broadcast Notifications</h1>
         <p className="text-sm text-slate-500 mt-0.5">Send a notification to all students or a specific year group</p>
@@ -198,7 +198,7 @@ export default function AdminNotificationsPage() {
           </div>
         )}
 
-        <div className="flex gap-3 pt-1">
+        <div className="flex flex-col sm:flex-row gap-3 pt-1">
           {!preview && (
             <button
               type="button"
@@ -229,9 +229,9 @@ export default function AdminNotificationsPage() {
             {recent.map((n, i) => (
               <div
                 key={i}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4"
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 sm:px-5 py-4"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-slate-900 dark:text-white text-sm">{n.title}</p>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.body}</p>

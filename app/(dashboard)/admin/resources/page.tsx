@@ -140,12 +140,12 @@ export default function AdminResourcesPage() {
             <h1 className="text-2xl font-semibold text-white">Resource Vault</h1>
             <p className="mt-1 text-sm text-slate-300">Upload, organize, and maintain learning materials for all students.</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
             <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-slate-200">Files: {resources.length}</span>
             <span className="rounded-full border border-cyan-300/25 bg-cyan-500/15 px-3 py-1 text-xs text-cyan-200">Levels covered: {resourceLevels}</span>
             <button
               onClick={() => { cancelForm(); setShowForm(!showForm) }}
-              className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition"
+              className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition w-full sm:w-auto"
             >
               <Plus size={15} />
               Upload
@@ -184,7 +184,7 @@ export default function AdminResourcesPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Course Code</label>
               <input
@@ -239,7 +239,7 @@ export default function AdminResourcesPage() {
           </div>
           )}
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-1">
             <button
               type="submit"
               disabled={submitting || (!editingId && !file)}
@@ -274,7 +274,7 @@ export default function AdminResourcesPage() {
           {resources.map((r) => (
             <div
               key={r.id}
-              className="flex items-center gap-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3"
+              className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-3"
             >
               <span className="text-xl shrink-0">{FILE_ICON[r.file_url?.split('.').pop() ?? ''] ?? '📁'}</span>
               <div className="flex-1 min-w-0">
@@ -295,19 +295,10 @@ export default function AdminResourcesPage() {
               >
                 View
               </a>
-              <button
-                onClick={() => startEdit(r)}
-                title="Edit"
-                className="text-slate-400 hover:text-violet-600 transition shrink-0"
-              >
-                <Pencil size={15} />
-              </button>
-              <button
-                onClick={() => deleteResource(r.id)}
-                className="text-slate-400 hover:text-red-500 transition shrink-0"
-              >
-                <Trash2 size={15} />
-              </button>
+              <div className="flex items-center gap-3 shrink-0 sm:ml-auto">
+                <button onClick={() => startEdit(r)} title="Edit" className="text-slate-400 hover:text-violet-600 transition shrink-0"><Pencil size={15} /></button>
+                <button onClick={() => deleteResource(r.id)} className="text-slate-400 hover:text-red-500 transition shrink-0"><Trash2 size={15} /></button>
+              </div>
             </div>
           ))}
         </div>
