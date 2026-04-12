@@ -40,6 +40,12 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     private_join_mode: 'approval' as 'approval' | 'code',
     private_entry_code: '',
   })
+  const pathnameRef = useRef(pathname)
+  const myChannelIdsRef = useRef<Set<string> | undefined>(undefined)
+
+  useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
 
   const { data: myChannelIds } = useQuery({
     queryKey: ['my-channel-memberships', user?.id],
@@ -53,6 +59,10 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
       return new Set((data ?? []).map((r) => r.channel_id))
     },
   })
+
+  useEffect(() => {
+    myChannelIdsRef.current = myChannelIds
+  }, [myChannelIds])
 
   const { data: channels } = useQuery({
     queryKey: ['channels'],
@@ -152,8 +162,8 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
           const row = payload.new as { channel_id: string | null; sender_id: string }
           if (!row.channel_id) return
           if (row.sender_id === user.id) return
-          if (!myChannelIds.has(row.channel_id)) return
-          if (pathname === `/chat/${row.channel_id}`) {
+          if (!myChannelIdsRef.current?.has(row.channel_id)) return
+          if (pathnameRef.current === `/chat/${row.channel_id}`) {
             setChannelUnread(row.channel_id, 0)
             return
           }
@@ -165,7 +175,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     return () => {
       supabase.removeChannel(ch)
     }
-  }, [user, myChannelIds, pathname, setChannelUnread, incChannelUnread])
+  }, [user, myChannelIds, setChannelUnread, incChannelUnread])
 
   // DM user search
   useEffect(() => {
