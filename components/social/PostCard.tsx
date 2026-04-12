@@ -32,10 +32,35 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const [reportNote, setReportNote] = useState('')
   const [reporting, setReporting] = useState(false)
   const [removed, setRemoved] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [sharedPulse, setSharedPulse] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
   // Sync when React Query cache is updated by realtime (likes/comments from others)
   useEffect(() => { setLikes(post.likes_count) }, [post.likes_count])
   useEffect(() => { setCommentsCount(post.comments_count) }, [post.comments_count])
+
+  useEffect(() => {
+    if (!menuOpen) return
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [menuOpen])
 
   async function toggleLike() {
     if (!user) return
@@ -81,6 +106,8 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
   function handleShare() {
     navigator.clipboard.writeText(`${window.location.origin}/social/${post.id}`)
+    setSharedPulse(true)
+    setTimeout(() => setSharedPulse(false), 420)
     toast.success('Link copied!')
   }
 
@@ -152,28 +179,50 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             </div>
           </Link>
           {user && (
-            <div className="relative group">
-              <button className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 transition">
+            <div ref={menuRef} className="relative">
+              <button
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                className="rounded-xl border border-slate-200/80 p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:border-slate-700 dark:hover:bg-slate-700"
+              >
                 <MoreHorizontal size={16} />
               </button>
-              <div className="absolute right-0 top-8 hidden group-focus-within:block bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl shadow-lg py-1 z-10 min-w-36">
-                {user.id === post.author_id && (
-                  <button
-                    onClick={() => setConfirmDelete(true)}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    role="menu"
+                    initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                    transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute right-0 top-10 z-10 min-w-40 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-1 shadow-xl backdrop-blur dark:border-slate-600 dark:bg-slate-700/95"
                   >
-                    <Trash2 size={13} /> Delete
-                  </button>
+                    {user.id === post.author_id && (
+                      <button
+                        onClick={() => {
+                          setConfirmDelete(true)
+                          setMenuOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    )}
+                    {user.id !== post.author_id && (
+                      <button
+                        onClick={() => {
+                          setShowReport(true)
+                          setMenuOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-600"
+                      >
+                        <Flag size={13} /> Report post
+                      </button>
+                    )}
+                  </motion.div>
                 )}
-                {user.id !== post.author_id && (
-                  <button
-                    onClick={() => setShowReport(true)}
-                    className="w-full text-left px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2"
-                  >
-                    <Flag size={13} /> Report post
-                  </button>
-                )}
-              </div>
+              </AnimatePresence>
             </div>
           )}
         </div>
@@ -203,41 +252,73 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 pt-3 dark:border-slate-700">
-          <button
+          <motion.button
             onClick={toggleLike}
+            whileTap={{ scale: 0.92 }}
+            whileHover={{ y: -1 }}
             className={cn(
               'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition',
               liked ? 'bg-red-50 text-red-500 dark:bg-red-950/40' : 'text-slate-500 hover:bg-slate-100 hover:text-red-500 dark:hover:bg-slate-700/70'
             )}
           >
-            <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
+            <motion.span
+              key={liked ? 'liked' : 'unliked'}
+              initial={{ scale: 0.8, rotate: liked ? -8 : 8 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
+            </motion.span>
             {likes > 0 && <span>{likes}</span>}
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
             onClick={() => setShowComments(!showComments)}
+            whileTap={{ scale: 0.94 }}
+            whileHover={{ y: -1 }}
             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
           >
-            <MessageCircle size={16} />
+            <motion.span
+              animate={showComments ? { rotate: [0, -6, 6, 0] } : undefined}
+              transition={{ duration: 0.22 }}
+            >
+              <MessageCircle size={16} />
+            </motion.span>
             {commentsCount > 0 && <span>{commentsCount}</span>}
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
             onClick={handleShare}
+            whileTap={{ scale: 0.94 }}
+            whileHover={{ y: -1 }}
             className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
           >
-            <Share2 size={16} />
-          </button>
+            <motion.span
+              animate={sharedPulse ? { x: [0, 2, -2, 2, 0], scale: [1, 1.08, 1] } : undefined}
+              transition={{ duration: 0.32 }}
+            >
+              <Share2 size={16} />
+            </motion.span>
+          </motion.button>
 
-          <button
+          <motion.button
             onClick={toggleBookmark}
+            whileTap={{ scale: 0.94 }}
+            whileHover={{ y: -1 }}
             className={cn(
               'ml-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition',
               bookmarked ? 'bg-violet-50 text-violet-600 dark:bg-violet-950/40' : 'text-slate-500 hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-700/70'
             )}
           >
-            <Bookmark size={16} fill={bookmarked ? 'currentColor' : 'none'} />
-          </button>
+            <motion.span
+              key={bookmarked ? 'bookmarked' : 'unbookmarked'}
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.18 }}
+            >
+              <Bookmark size={16} fill={bookmarked ? 'currentColor' : 'none'} />
+            </motion.span>
+          </motion.button>
         </div>
       </div>
 
@@ -427,19 +508,26 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
   }
 
   return (
-    <div className="border-t border-slate-100 dark:border-slate-700 px-4 py-3 space-y-3">
+    <div className="border-t border-slate-100 bg-slate-50/55 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/45 sm:px-5 sm:py-5">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Conversation</p>
+        <p className="text-xs text-slate-400">{comments.length} {comments.length === 1 ? 'comment' : 'comments'}</p>
+      </div>
+
       {loading ? (
-        <p className="text-xs text-slate-400">Loading comments…</p>
+        <p className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2 text-xs text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">Loading comments…</p>
       ) : (
-        comments.map((c) => (
-          <CommentItem key={c.id} comment={c} onReply={(id, name) => { setReplyingTo({ id, name }); setText('') }} />
-        ))
+        <div className="space-y-3">
+          {comments.map((c) => (
+            <CommentItem key={c.id} comment={c} onReply={(id, name) => { setReplyingTo({ id, name }); setText('') }} />
+          ))}
+        </div>
       )}
 
       {user && (
-        <form onSubmit={submit} className="flex flex-col gap-2 mt-2">
+        <form onSubmit={submit} className="mt-4 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800/90 sm:p-3.5">
           {replyingTo && (
-            <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-700/50 px-3 py-1.5 rounded-lg">
+            <div className="mb-2 flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1.5 text-xs text-slate-500 dark:bg-slate-700/50">
               <Reply size={12} className="text-violet-500" />
               <span>Replying to <strong className="text-slate-700 dark:text-slate-300">@{replyingTo.name}</strong></span>
               <button type="button" onClick={() => setReplyingTo(null)} className="ml-auto text-slate-400 hover:text-slate-600">
@@ -447,20 +535,21 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
               </button>
             </div>
           )}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
-            <input
+            <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={replyingTo ? `Reply to ${replyingTo.name}…` : 'Write a comment…'}
-              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none placeholder-slate-400 focus:ring-2 focus:ring-violet-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+              rows={2}
+              className="min-h-[68px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-violet-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
             />
             <button
               type="submit"
               disabled={!text.trim()}
-              className="w-full rounded-xl bg-violet-600 px-3 py-2 text-xs font-medium text-white disabled:opacity-40 sm:w-auto"
+              className="w-full rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-40 sm:w-auto"
             >
-              Post
+              {replyingTo ? 'Reply' : 'Post'}
             </button>
           </div>
         </form>
@@ -475,19 +564,19 @@ function CommentItem({ comment, onReply, depth = 0 }: {
   depth?: number
 }) {
   return (
-    <div className={cn('flex items-start gap-2.5', depth > 0 && 'ml-4 mt-2 sm:ml-8')}>
+    <div className={cn('flex items-start gap-2.5', depth > 0 && 'ml-4 mt-2 border-l border-slate-200 pl-3 dark:border-slate-700 sm:ml-8')}>
       <Avatar src={comment.author.avatar_url} name={comment.author.full_name} size="sm" />
       <div className="flex-1 min-w-0">
-        <div className="bg-slate-50 dark:bg-slate-700 rounded-xl px-3 py-2">
+        <div className="rounded-2xl border border-slate-200/80 bg-white/95 px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
           <p className="text-xs font-semibold text-slate-800 dark:text-white">{comment.author.full_name}</p>
-          <p className="mt-0.5 break-words text-xs text-slate-700 dark:text-slate-200">{comment.content}</p>
+          <p className="mt-1 break-words text-sm leading-6 text-slate-700 dark:text-slate-200">{comment.content}</p>
         </div>
-        <div className="flex items-center gap-3 mt-1 ml-1">
+        <div className="ml-1 mt-1 flex items-center gap-3">
           <span className="text-[10px] text-slate-400">{timeAgo(comment.created_at)}</span>
           {depth === 0 && (
             <button
               onClick={() => onReply(comment.id, comment.author.username)}
-              className="text-[10px] text-slate-400 hover:text-violet-600 flex items-center gap-1 transition"
+              className="flex items-center gap-1 text-[10px] text-slate-400 transition hover:text-violet-600"
             >
               <Reply size={11} /> Reply
             </button>
