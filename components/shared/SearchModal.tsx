@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Search, X, User, FileText, Loader2, Clock3, ArrowUpRight, Compass, MessageSquare, Tv2, Vote } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Avatar } from '@/components/shared/Avatar'
 import { cn } from '@/lib/utils/cn'
 import type { Profile, Post } from '@/types/app'
@@ -20,6 +21,9 @@ interface SearchModalProps {
 const RECENT_SEARCHES_KEY = 'ccossa-recent-searches'
 
 const TOP_CATEGORIES = [
+  { label: 'Upcoming Events', hint: 'What is next on campus', href: '/entertain', icon: Tv2 },
+  { label: 'Find Students', hint: 'Discover people in COSSA', href: '/people', icon: User },
+  { label: 'Account Settings', hint: 'Edit profile and account', href: '/profile/edit', icon: Compass },
   { label: 'People', hint: 'Profiles and members', href: '/people', icon: User },
   { label: 'Feed', hint: 'Posts and updates', href: '/', icon: Compass },
   { label: 'Chat', hint: 'Channels and DMs', href: '/chat', icon: MessageSquare },
@@ -186,15 +190,27 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
     activeEl?.scrollIntoView({ block: 'nearest' })
   }, [activeIndex])
 
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center px-0 pb-0 pt-0 sm:px-4 sm:pb-0 sm:pt-[10vh]">
+    <AnimatePresence>
+      {open && (
+    <motion.div
+      className="fixed inset-0 z-[120] flex items-end justify-center px-0 pb-0 pt-0 sm:items-center sm:px-4 sm:pb-0 sm:pt-0"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+    >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative flex h-dvh w-full flex-col overflow-hidden border border-slate-200/80 bg-white/96 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/96 sm:h-auto sm:max-h-[74dvh] sm:max-w-2xl sm:rounded-[1.75rem]">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, y: 8 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="relative flex h-dvh w-full flex-col overflow-hidden border border-slate-200/80 bg-white/96 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/96 sm:h-auto sm:max-h-[74dvh] sm:max-w-2xl sm:rounded-[1.75rem]"
+      >
         {/* Input */}
         <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-700 sm:px-5">
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -415,7 +431,9 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

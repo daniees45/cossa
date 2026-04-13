@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { Bell, Search, Sun, Moon, LogOut, User, Settings } from 'lucide-react'
+import { Bell, Search, Sun, Moon, LogOut, User, Settings, X, MessageSquare, Megaphone, CheckCircle2, AlertTriangle, BellOff } from 'lucide-react'
 import { useTheme } from '@/lib/context/ThemeProvider'
 import { SearchModal } from '@/components/shared/SearchModal'
 import { useNotificationStore } from '@/lib/stores/notificationStore'
@@ -8,6 +8,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { getInitials } from '@/lib/utils/uploadFile'
 import { cn } from '@/lib/utils/cn'
 import { useState, useEffect, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 import { timeAgo } from '@/lib/utils/formatDate'
@@ -28,6 +29,7 @@ export function Topbar() {
   const { user } = useUser()
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [showMobileHelper, setShowMobileHelper] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -50,17 +52,30 @@ export function Topbar() {
   // Load notifications on mount
   useEffect(() => {
     if (!user) return
+    setNotificationsLoading(true)
     const supabase = createClient()
-    supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .in('type', VISIBLE_NOTIFICATION_TYPES)
-      .order('created_at', { ascending: false })
-      .limit(20)
-      .then(({ data }) => {
-        if (data) setNotifications(data as Notification[])
-      })
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const { data } = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('type', VISIBLE_NOTIFICATION_TYPES)
+          .order('created_at', { ascending: false })
+          .limit(20)
+        if (!cancelled && data) setNotifications(data as Notification[])
+      } finally {
+        if (!cancelled) setNotificationsLoading(false)
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
   }, [user, setNotifications])
 
   // Close on outside click
@@ -138,8 +153,26 @@ export function Topbar() {
     router.push('/login')
   }
 
+  function notificationTypeMeta(type: string) {
+    if (type === 'comment') return { icon: MessageSquare, badgeClass: 'bg-violet-500', ringClass: 'text-violet-600 dark:text-violet-300' }
+    if (type === 'broadcast') return { icon: Megaphone, badgeClass: 'bg-cyan-500', ringClass: 'text-cyan-600 dark:text-cyan-300' }
+    if (type.includes('approved')) return { icon: CheckCircle2, badgeClass: 'bg-emerald-500', ringClass: 'text-emerald-600 dark:text-emerald-300' }
+    if (type.includes('rejected')) return { icon: AlertTriangle, badgeClass: 'bg-amber-500', ringClass: 'text-amber-600 dark:text-amber-300' }
+    return { icon: Bell, badgeClass: 'bg-slate-500', ringClass: 'text-slate-600 dark:text-slate-300' }
+  }
+
+  async function handleMarkOneRead(id: string) {
+    markOneRead(id)
+    const supabase = createClient()
+    await supabase.from('notifications').update({ read: true }).eq('id', id)
+  }
+
+  function handleDismissNotification(id: string) {
+    setNotifications(notifications.filter((n) => n.id !== id))
+  }
+
   return (
-    <header className="sticky top-0 z-40 flex h-14 min-w-0 items-center gap-2 border-b border-slate-200/90 bg-white/90 px-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/88 sm:gap-3 sm:px-4 md:px-6">
+    <header className="relative sticky top-0 z-40 flex h-14 min-w-0 items-center gap-2 border-b border-slate-200/90 bg-white/90 px-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/88 sm:gap-3 sm:px-4 md:px-6">
       {/* COSSA logo - mobile only */}
       <div className="mr-0.5 flex min-w-0 items-center gap-2 md:hidden sm:mr-1">
         <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
@@ -149,20 +182,57 @@ export function Topbar() {
       </div>
 
       {/* Search */}
-      <div
-        onClick={() => setSearchOpen(true)}
-        className={cn(
-          'hidden max-w-sm flex-1 cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/70 px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 sm:flex',
-          searchOpen
-            ? 'scale-[1.01] border-violet-300/90 ring-2 ring-violet-500/20 shadow-[0_12px_30px_rgba(124,58,237,0.12),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-violet-700/80 dark:bg-slate-800/80'
-            : 'hover:border-slate-300 hover:bg-white/90 dark:border-slate-700 dark:bg-slate-800/65 dark:hover:bg-slate-800/85'
-        )}
-      >
-        <Search size={15} className="shrink-0 text-violet-500" />
-        <span className="flex-1 text-sm font-medium leading-normal text-slate-600 dark:text-slate-300">Search people, posts, or jump anywhere</span>
-        <kbd className="hidden rounded-full border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.9))] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-slate-500 shadow-sm dark:border-slate-600 dark:bg-[linear-gradient(180deg,rgba(51,65,85,0.95),rgba(30,41,59,0.9))] dark:text-slate-300 lg:inline">
-          ⌘K
-        </kbd>
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden w-[min(40rem,calc(100%-22rem))] -translate-x-1/2 -translate-y-1/2 md:block lg:w-[min(44rem,calc(100%-24rem))]">
+        <div
+          onClick={() => setSearchOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              setSearchOpen(true)
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          className={cn(
+            'pointer-events-auto flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/70 px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40',
+            searchOpen
+              ? 'scale-[1.01] border-violet-300/90 ring-2 ring-violet-500/20 shadow-[0_12px_30px_rgba(124,58,237,0.12),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-violet-700/80 dark:bg-slate-800/80'
+              : 'hover:border-slate-300 hover:bg-white/90 dark:border-slate-700 dark:bg-slate-800/65 dark:hover:bg-slate-800/85'
+          )}
+          aria-label="Open search"
+        >
+          <span className="relative h-4 w-4 shrink-0 text-violet-500">
+            <AnimatePresence mode="wait" initial={false}>
+              {searchOpen ? (
+                <motion.span
+                  key="close"
+                  initial={{ opacity: 0, rotate: -35, scale: 0.7 }}
+                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                  exit={{ opacity: 0, rotate: 35, scale: 0.7 }}
+                  transition={{ duration: 0.16 }}
+                  className="absolute inset-0"
+                >
+                  <X size={15} />
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="search"
+                  initial={{ opacity: 0, rotate: 35, scale: 0.7 }}
+                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                  exit={{ opacity: 0, rotate: -35, scale: 0.7 }}
+                  transition={{ duration: 0.16 }}
+                  className="absolute inset-0"
+                >
+                  <Search size={15} />
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </span>
+          <span className="flex-1 text-sm font-medium leading-normal text-slate-600 dark:text-slate-300">Search people, posts, or jump anywhere</span>
+          <kbd className="hidden rounded-full border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.9))] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-slate-500 shadow-sm dark:border-slate-600 dark:bg-[linear-gradient(180deg,rgba(51,65,85,0.95),rgba(30,41,59,0.9))] dark:text-slate-300 lg:inline">
+            ⌘K
+          </kbd>
+        </div>
       </div>
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
@@ -194,41 +264,91 @@ export function Topbar() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-12 w-[min(20rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">Notifications</p>
+            <div className="absolute right-0 top-12 z-50 w-[min(23rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-800/95">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Inbox</p>
+                  <p className="text-[11px] text-slate-400">{unreadCount} unread</p>
+                </div>
                 {unreadCount > 0 && (
-                  <button onClick={handleMarkAllRead} className="text-xs text-violet-600 hover:underline">
+                  <button onClick={handleMarkAllRead} className="text-xs font-medium text-violet-600 hover:underline">
                     Mark all read
                   </button>
                 )}
               </div>
               <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
-                {notifications.length === 0 && (
-                  <p className="text-sm text-slate-400 text-center py-8">No notifications yet</p>
+                {notificationsLoading && (
+                  <div className="space-y-2 px-4 py-4">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="h-14 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-700" />
+                    ))}
+                  </div>
+                )}
+                {!notificationsLoading && notifications.length === 0 && (
+                  <div className="px-4 py-9 text-center">
+                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500">
+                      <BellOff size={16} />
+                    </div>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Inbox is quiet</p>
+                    <p className="mt-1 text-xs text-slate-400">New alerts and activity will show up here.</p>
+                  </div>
                 )}
                 {notifications.map((n) => (
                   <div
                     key={n.id}
                     onClick={async () => {
                       if (!n.read) {
-                        markOneRead(n.id)
-                        const supabase = createClient()
-                        await supabase.from('notifications').update({ read: true }).eq('id', n.id)
+                        await handleMarkOneRead(n.id)
                       }
                       if (n.link) router.push(n.link)
                       setOpen(false)
                     }}
                     className={cn(
-                      'flex gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition',
-                      !n.read && 'bg-violet-50 dark:bg-violet-900/10'
+                      'group cursor-pointer px-4 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-700/50',
+                      !n.read && 'bg-violet-50/70 dark:bg-violet-900/12'
                     )}
                   >
-                    <div className="w-2 h-2 rounded-full bg-violet-500 mt-2 shrink-0 opacity-0 data-[unread=true]:opacity-100" data-unread={!n.read} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{n.title}</p>
-                      <p className="text-xs leading-normal text-slate-500 mt-0.5 truncate">{n.body}</p>
-                      <p className="text-xs text-slate-400 mt-1">{timeAgo(n.created_at)}</p>
+                    <div className="flex items-start gap-3">
+                      <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700">
+                        <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-600 dark:text-slate-200">
+                          {n.title.slice(0, 1).toUpperCase()}
+                        </div>
+                        <span className={cn('absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white text-white dark:border-slate-800', notificationTypeMeta(n.type).badgeClass)}>
+                          {(() => {
+                            const Icon = notificationTypeMeta(n.type).icon
+                            return <Icon size={9} />
+                          })()}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{n.title}</p>
+                        <p className="mt-0.5 truncate text-xs leading-normal text-slate-500">{n.body}</p>
+                        <div className="mt-1.5 flex items-center justify-between gap-2">
+                          <p className="text-[11px] text-slate-400">{timeAgo(n.created_at)}</p>
+                          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100">
+                            {!n.read && (
+                              <button
+                                onClick={async (event) => {
+                                  event.stopPropagation()
+                                  await handleMarkOneRead(n.id)
+                                }}
+                                className="rounded-md bg-violet-100 px-2 py-1 text-[10px] font-semibold text-violet-700 transition hover:bg-violet-200 dark:bg-violet-900/40 dark:text-violet-300"
+                              >
+                                Read
+                              </button>
+                            )}
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                handleDismissNotification(n.id)
+                              }}
+                              className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
