@@ -172,8 +172,15 @@ function FeedPageContent() {
     const supabase = createClient()
     const knownIds = new Set([...localPosts, ...allPosts].map((p) => p.id))
 
+    // Defensive cleanup: remove stale channels that may remain during rapid remounts.
+    for (const existing of supabase.getChannels()) {
+      if (existing.topic.includes('realtime-feed-new-posts')) {
+        supabase.removeChannel(existing)
+      }
+    }
+
     const ch = supabase
-      .channel('realtime-feed-new-posts')
+      .channel(`realtime-feed-new-posts-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'posts' },
