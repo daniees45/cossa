@@ -140,7 +140,6 @@ export function CommentsSurface({
   const searchParams = useSearchParams()
   const isOverlay = mode === 'overlay'
   const isVisible = isOverlay ? open : true
-
   const [comments, setComments] = useState<CommentRow[]>([])
   const [displayCount, setDisplayCount] = useState(initialCommentCount)
   const [text, setText] = useState('')
@@ -459,7 +458,7 @@ export function CommentsSurface({
 
       <div className={cn(
         'subtle-scrollbar min-h-0 flex-1 overflow-y-auto border-t border-slate-100 bg-slate-50/55 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/45 sm:px-5 sm:py-5',
-        user && 'pb-[calc(var(--mobile-nav-height)+6.4rem)] md:pb-5'
+        user && isOverlay && 'pb-[calc(var(--mobile-nav-height)+6.4rem)] md:pb-5'
       )}>
         {loading ? (
           <div className="space-y-3">
@@ -587,7 +586,7 @@ export function CommentsSurface({
               </button>
             )}
 
-            <div className="hidden items-end gap-2 md:flex">
+            <div className={cn('items-end gap-2', isOverlay ? 'hidden md:flex' : 'flex')}>
               <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
               <div className="flex-1 rounded-2xl border border-slate-200/80 bg-white/95 p-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
                 <textarea

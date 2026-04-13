@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Palette, RotateCcw, Save, UploadCloud } from 'lucide-react'
+import { Loader2, Palette, RotateCcw, Save, UploadCloud } from 'lucide-react'
 import { DEFAULT_SITE_BRANDING, type SiteBranding } from '@/lib/siteBranding'
 import { useSiteBranding } from '@/lib/hooks/useSiteBranding'
 import { toast } from 'sonner'
@@ -93,7 +93,13 @@ export default function AdminAppearancePage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-        <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4">
+        <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-4">
+          {loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center gap-2.5 rounded-2xl bg-white/80 text-sm text-slate-500 backdrop-blur-sm dark:bg-slate-900/80">
+              <Loader2 size={18} className="animate-spin text-cyan-500" />
+              Loading brand settings…
+            </div>
+          )}
           <Field label="Site title">
             <input
               value={draft.siteTitle}
@@ -191,7 +197,8 @@ export default function AdminAppearancePage() {
               disabled={!dirty || saving}
               className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-55"
             >
-              <Save size={15} /> {saving ? 'Saving...' : 'Save changes'}
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+              {saving ? 'Saving…' : 'Save changes'}
             </button>
             <button
               onClick={resetDefaults}
