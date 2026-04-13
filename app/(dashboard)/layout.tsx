@@ -5,10 +5,12 @@ import { RealtimeProvider } from '@/components/layout/RealtimeProvider'
 import { DialogProvider } from '@/components/shared/DialogProvider'
 import { NavigationProgress } from '@/components/shared/NavigationProgress'
 import { DashboardTransitionShell } from '@/components/layout/DashboardTransitionShell'
+import { InitialDashboardSplash } from '@/components/layout/InitialDashboardSplash'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <RealtimeProvider>
+      <InitialDashboardSplash />
       <NavigationProgress />
       <DialogProvider>
         <div

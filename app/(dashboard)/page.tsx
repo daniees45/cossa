@@ -4,9 +4,10 @@ import { PostCard } from '@/components/social/PostCard'
 import { PostEditor } from '@/components/social/PostEditor'
 import { FeedSkeleton } from '@/components/social/FeedSkeleton'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { Spinner } from '@/components/shared/Spinner'
 import { SuggestedUsers } from '@/components/social/SuggestedUsers'
 import { TrendingTopics } from '@/components/social/TrendingTopics'
-import { LayoutGrid, Loader2, Users, Bookmark, Megaphone, ChevronsDown } from 'lucide-react'
+import { LayoutGrid, Users, Bookmark, Megaphone, ChevronsDown } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useUser } from '@/lib/hooks/useUser'
 import type { PostWithAuthor } from '@/types/app'
@@ -121,6 +122,7 @@ function FeedPageContent() {
   const [newAuthors, setNewAuthors] = useState<NewPostAuthor[]>([])
   const loaderRef = useRef<HTMLDivElement>(null)
   const feedTopRef = useRef<HTMLDivElement>(null)
+  const initialReadyDispatchedRef = useRef(false)
 
   const allPosts = data?.pages.flatMap((p) => p) ?? []
 
@@ -170,6 +172,23 @@ function FeedPageContent() {
     observer.observe(el)
     return () => observer.disconnect()
   }, [handleIntersect])
+
+  useEffect(() => {
+    if (mode !== 'all' || initialReadyDispatchedRef.current || isLoading) return
+
+    let frameB = 0
+    const frameA = window.requestAnimationFrame(() => {
+      frameB = window.requestAnimationFrame(() => {
+        initialReadyDispatchedRef.current = true
+        window.dispatchEvent(new Event('ccossa:feed-ready'))
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frameA)
+      if (frameB) window.cancelAnimationFrame(frameB)
+    }
+  }, [feed.length, isLoading, mode])
 
   // ── Realtime new-posts listener (only on "For You" tab) ─────────────────────
   useEffect(() => {
@@ -368,8 +387,21 @@ function FeedPageContent() {
                   )}
                 </div>
               ))}
-              <div ref={loaderRef} className="flex justify-center py-4">
-                {isFetchingNextPage && <Loader2 size={20} className="animate-spin text-violet-600" />}
+              <div ref={loaderRef} className="flex justify-center py-5">
+                <AnimatePresence>
+                  {isFetchingNextPage && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/88 px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-900/88"
+                    >
+                      <Spinner size="sm" className="border-slate-300 border-t-violet-500 dark:border-slate-700" />
+                      <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Loading more posts</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           )}

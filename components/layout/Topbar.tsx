@@ -151,11 +151,18 @@ export function Topbar() {
       {/* Search */}
       <div
         onClick={() => setSearchOpen(true)}
-        className="flex-1 max-w-xs hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+        className={cn(
+          'hidden max-w-sm flex-1 cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/70 px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 sm:flex',
+          searchOpen
+            ? 'scale-[1.01] border-violet-300/90 ring-2 ring-violet-500/20 shadow-[0_12px_30px_rgba(124,58,237,0.12),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-violet-700/80 dark:bg-slate-800/80'
+            : 'hover:border-slate-300 hover:bg-white/90 dark:border-slate-700 dark:bg-slate-800/65 dark:hover:bg-slate-800/85'
+        )}
       >
-        <Search size={15} className="text-slate-400 shrink-0" />
-        <span className="text-sm leading-normal text-slate-400 flex-1">Search…</span>
-        <kbd className="hidden lg:inline text-[10px] text-slate-400 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">⌘K</kbd>
+        <Search size={15} className="shrink-0 text-violet-500" />
+        <span className="flex-1 text-sm font-medium leading-normal text-slate-600 dark:text-slate-300">Search people, posts, or jump anywhere</span>
+        <kbd className="hidden rounded-full border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.9))] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-slate-500 shadow-sm dark:border-slate-600 dark:bg-[linear-gradient(180deg,rgba(51,65,85,0.95),rgba(30,41,59,0.9))] dark:text-slate-300 lg:inline">
+          ⌘K
+        </kbd>
       </div>
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
