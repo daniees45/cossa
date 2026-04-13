@@ -9,6 +9,8 @@ import {
   brandingToRow,
 } from '@/lib/siteBranding'
 
+const BRANDING_EVENT = 'site-branding-updated'
+
 export function useSiteBranding() {
   const [branding, setBranding] = useState<SiteBranding>(DEFAULT_SITE_BRANDING)
   const [loading, setLoading] = useState(true)
@@ -63,8 +65,18 @@ export function useSiteBranding() {
       })
       .subscribe()
 
+    const onBrandingEvent = (event: Event) => {
+      const custom = event as CustomEvent<SiteBranding | undefined>
+      if (custom.detail) {
+        setBranding(custom.detail)
+      }
+    }
+
+    window.addEventListener(BRANDING_EVENT, onBrandingEvent)
+
     return () => {
       cancelled = true
+      window.removeEventListener(BRANDING_EVENT, onBrandingEvent)
       supabase.removeChannel(channel)
     }
   }, [])
@@ -90,6 +102,7 @@ export function useSiteBranding() {
     })
 
     setBranding(next)
+    window.dispatchEvent(new CustomEvent<SiteBranding>(BRANDING_EVENT, { detail: next }))
   }
 
   return { branding, loading, updateBranding }
