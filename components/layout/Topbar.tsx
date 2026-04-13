@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { Bell, Search, Sun, Moon, LogOut, User, Settings, X, MessageSquare, Megaphone, CheckCircle2, AlertTriangle, BellOff, Loader2 } from 'lucide-react'
+import { Bell, Search, Sun, Moon, LogOut, User, Settings, X, MessageSquare, Megaphone, CheckCircle2, AlertTriangle, BellOff, Loader2, Hash } from 'lucide-react'
 import { useTheme } from '@/lib/context/ThemeProvider'
 import { useNotificationStore } from '@/lib/stores/notificationStore'
 import { useUser } from '@/lib/hooks/useUser'
@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 import { timeAgo } from '@/lib/utils/formatDate'
 import type { Notification } from '@/types/app'
+import { useSiteBranding } from '@/lib/hooks/useSiteBranding'
 
 const VISIBLE_NOTIFICATION_TYPES = [
   'broadcast',
@@ -22,18 +23,42 @@ const VISIBLE_NOTIFICATION_TYPES = [
   'system',
 ]
 
+const QUICK_ACTIONS = [
+  { id: 'action-chat', label: 'Open Chat', subtitle: 'Channels and direct messages', href: '/chat' },
+  { id: 'action-people', label: 'Find People', subtitle: 'Browse members and profiles', href: '/people' },
+  { id: 'action-feed', label: 'Go to Feed', subtitle: 'See latest posts and updates', href: '/' },
+  { id: 'action-entertainment', label: 'Open Entertainment', subtitle: 'Events and gallery', href: '/entertain' },
+]
+
+type SearchSuggestion = {
+  id: string
+  label: string
+  subtitle: string
+  href: string
+  kind: 'user' | 'channel' | 'action'
+}
+
 export function Topbar() {
   const { unreadCount, notifications, markAllRead, markOneRead, setNotifications } = useNotificationStore()
   const { user } = useUser()
+  const { branding } = useSiteBranding()
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchingInline, setSearchingInline] = useState(false)
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false)
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([])
+  const [searchSuggestionsLoading, setSearchSuggestionsLoading] = useState(false)
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [showMobileHelper, setShowMobileHelper] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const mobileSearchWrapRef = useRef<HTMLDivElement>(null)
+  const desktopSearchWrapRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const searchRequestRef = useRef(0)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -84,6 +109,9 @@ export function Topbar() {
     function handler(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false)
+      const insideMobileSearch = mobileSearchWrapRef.current?.contains(e.target as Node)
+      const insideDesktopSearch = desktopSearchWrapRef.current?.contains(e.target as Node)
+      if (!insideMobileSearch && !insideDesktopSearch) setSearchDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -93,9 +121,84 @@ export function Topbar() {
   useEffect(() => {
     setOpen(false)
     setUserMenuOpen(false)
+    setSearchDropdownOpen(false)
     const main = document.getElementById('dashboard-main')
     main?.focus({ preventScroll: true })
   }, [pathname])
+
+  useEffect(() => {
+    const term = searchQuery.trim().toLowerCase()
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current)
+    }
+
+    const filteredActions = QUICK_ACTIONS
+      .filter((action) => {
+        if (!term) return true
+        return `${action.label} ${action.subtitle}`.toLowerCase().includes(term)
+      })
+      .slice(0, 4)
+      .map((action) => ({ ...action, kind: 'action' as const }))
+
+    if (term.length < 2) {
+      setSearchSuggestions(filteredActions)
+      setSearchSuggestionsLoading(false)
+      setActiveSuggestionIndex(filteredActions.length > 0 ? 0 : -1)
+      return
+    }
+
+    setSearchSuggestionsLoading(true)
+    const requestId = ++searchRequestRef.current
+
+    searchDebounceRef.current = setTimeout(() => {
+      const supabase = createClient()
+      const like = `%${term}%`
+
+      Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, username, full_name')
+          .or(`full_name.ilike.${like},username.ilike.${like}`)
+          .limit(5),
+        supabase
+          .from('channels')
+          .select('id, name, description')
+          .or(`name.ilike.${like},description.ilike.${like}`)
+          .limit(5),
+      ])
+        .then(([profilesResult, channelsResult]) => {
+          if (searchRequestRef.current !== requestId) return
+          const users = (profilesResult.data ?? []).map((u: { id: string; username: string; full_name: string | null }) => ({
+            id: `user-${u.id}`,
+            label: u.full_name || u.username,
+            subtitle: `@${u.username}`,
+            href: `/profile/${u.username}`,
+            kind: 'user' as const,
+          }))
+
+          const channels = (channelsResult.data ?? []).map((c: { id: string; name: string; description: string | null }) => ({
+            id: `channel-${c.id}`,
+            label: `#${c.name}`,
+            subtitle: c.description || 'Open chat channel',
+            href: `/chat/${c.id}`,
+            kind: 'channel' as const,
+          }))
+
+          const nextSuggestions = [...users, ...channels, ...filteredActions].slice(0, 10)
+          setSearchSuggestions(nextSuggestions)
+          setActiveSuggestionIndex(nextSuggestions.length > 0 ? 0 : -1)
+        })
+        .finally(() => {
+          if (searchRequestRef.current === requestId) {
+            setSearchSuggestionsLoading(false)
+          }
+        })
+    }, 220)
+
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [searchQuery])
 
   // Mobile helper row: show once, auto-dismiss after a few seconds,
   // and permanently hide after first user interaction.
@@ -171,8 +274,22 @@ export function Topbar() {
     setNotifications(notifications.filter((n) => n.id !== id))
   }
 
+  function handleChooseSuggestion(suggestion: SearchSuggestion) {
+    router.push(suggestion.href)
+    setSearchDropdownOpen(false)
+    setSearchQuery('')
+  }
+
   async function handleInlineSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (searchSuggestions.length > 0) {
+      const picked = searchSuggestions[Math.max(0, activeSuggestionIndex)]
+      if (picked) {
+        handleChooseSuggestion(picked)
+        return
+      }
+    }
+
     const term = searchQuery.trim()
     if (term.length < 2 || searchingInline) return
 
@@ -213,76 +330,162 @@ export function Topbar() {
     }
   }
 
+  const renderSearchDropdown = (mobile: boolean) => {
+    if (!searchDropdownOpen) return null
+    return (
+      <div
+        className={cn(
+          'absolute top-full z-[70] mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur dark:border-slate-700 dark:bg-slate-800/95',
+          mobile ? 'left-0 right-0' : 'left-0 right-0'
+        )}
+        role="listbox"
+        aria-label="Search suggestions"
+      >
+        {searchSuggestionsLoading && (
+          <div className="flex items-center gap-2 px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+            <Loader2 size={12} className="animate-spin" />
+            Loading suggestions...
+          </div>
+        )}
+        {!searchSuggestionsLoading && searchSuggestions.length === 0 && (
+          <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">No suggestions yet</div>
+        )}
+        {searchSuggestions.map((suggestion, index) => (
+          <button
+            key={suggestion.id}
+            type="button"
+            role="option"
+            aria-selected={index === activeSuggestionIndex}
+            onMouseEnter={() => setActiveSuggestionIndex(index)}
+            onClick={() => handleChooseSuggestion(suggestion)}
+            className={cn(
+              'flex w-full items-start gap-2.5 px-3 py-2 text-left transition',
+              index === activeSuggestionIndex ? 'bg-violet-50 dark:bg-violet-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-700/60'
+            )}
+          >
+            <span className="mt-0.5 shrink-0 text-slate-400">
+              {suggestion.kind === 'user' && <User size={14} />}
+              {suggestion.kind === 'channel' && <Hash size={14} />}
+              {suggestion.kind === 'action' && <Search size={14} />}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-semibold text-slate-800 dark:text-slate-100">{suggestion.label}</span>
+              <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">{suggestion.subtitle}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <header className="relative sticky top-0 z-40 flex h-14 min-w-0 items-center gap-1.5 border-b border-slate-200/90 bg-white/90 px-2 shadow-[0_2px_10px_rgba(15,23,42,0.04)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/88 min-[370px]:gap-2 min-[370px]:px-3 sm:gap-3 sm:px-4 md:px-6">
       {/* COSSA logo - mobile only */}
       <div className="mr-0.5 flex min-w-0 items-center gap-1.5 md:hidden sm:mr-1 sm:gap-2">
-        <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
-          <span className="text-white font-bold text-xs">C</span>
+        <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center overflow-hidden">
+          {branding.logoUrl
+            ? <img src={branding.logoUrl} alt="" className="h-full w-full object-cover" />
+            : <span className="text-white font-bold text-xs">{(branding.siteTitle[0] || 'C').toUpperCase()}</span>}
         </div>
-        <span className="hidden max-w-20 truncate text-sm font-bold leading-normal text-slate-900 dark:text-white min-[340px]:inline min-[370px]:max-w-none">COSSA</span>
+        <span className="hidden max-w-20 truncate text-sm font-bold leading-normal text-slate-900 dark:text-white min-[340px]:inline min-[370px]:max-w-none">{branding.siteTitle}</span>
       </div>
 
       {/* Mobile inline search */}
-      <form
-        onSubmit={handleInlineSearchSubmit}
-        className="mr-0.5 flex min-w-0 basis-0 flex-1 items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/85 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 focus-within:border-violet-300/90 focus-within:ring-2 focus-within:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-800/80 min-[370px]:mr-1 min-[370px]:gap-2 min-[370px]:px-2.5 md:hidden"
-        aria-label="Inline search"
-      >
-        <span className="relative h-4 w-4 shrink-0 text-violet-500">
-          {searchingInline ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-        </span>
-        <input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search"
-          aria-label="Search people or posts"
-          className="min-w-[11ch] flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-500 dark:text-slate-200 dark:placeholder:text-slate-400"
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            className="rounded-md p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-            aria-label="Clear search"
-          >
-            <X size={12} />
-          </button>
-        )}
-      </form>
-
-      {/* Search */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden w-[min(40rem,calc(100%-22rem))] -translate-x-1/2 -translate-y-1/2 md:block lg:w-[min(44rem,calc(100%-24rem))]">
+      <div ref={mobileSearchWrapRef} className="relative mr-0.5 min-w-0 basis-0 flex-1 md:hidden min-[370px]:mr-1">
         <form
           onSubmit={handleInlineSearchSubmit}
-          className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/80 px-3.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 focus-within:border-violet-300/90 focus-within:ring-2 focus-within:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-800/75"
+          className="flex min-w-0 items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/85 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 focus-within:border-violet-300/90 focus-within:ring-2 focus-within:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-800/80 min-[370px]:gap-2 min-[370px]:px-2.5"
           aria-label="Inline search"
         >
           <span className="relative h-4 w-4 shrink-0 text-violet-500">
-            {searchingInline ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+            {searchingInline || searchSuggestionsLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           </span>
           <input
-            ref={searchInputRef}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search people or posts"
-            aria-label="Search people or posts"
-            className="min-w-0 flex-1 bg-transparent text-sm font-medium leading-normal text-slate-700 outline-none placeholder:text-slate-500 dark:text-slate-200 dark:placeholder:text-slate-400"
+            onFocus={() => setSearchDropdownOpen(true)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setSearchDropdownOpen(true)
+            }}
+            onKeyDown={(e) => {
+              if (!searchDropdownOpen || searchSuggestions.length === 0) return
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setActiveSuggestionIndex((i) => (i + 1) % searchSuggestions.length)
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setActiveSuggestionIndex((i) => (i <= 0 ? searchSuggestions.length - 1 : i - 1))
+              }
+            }}
+            placeholder="Search"
+            aria-label="Search people, channels, or actions"
+            className="min-w-[11ch] flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-500 dark:text-slate-200 dark:placeholder:text-slate-400"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+              className="rounded-md p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
               aria-label="Clear search"
             >
-              <X size={14} />
+              <X size={12} />
             </button>
           )}
-          <kbd className="hidden rounded-full border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.9))] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-slate-500 shadow-sm dark:border-slate-600 dark:bg-[linear-gradient(180deg,rgba(51,65,85,0.95),rgba(30,41,59,0.9))] dark:text-slate-300 lg:inline">
-            ⌘K
-          </kbd>
         </form>
+        {renderSearchDropdown(true)}
+      </div>
+
+      {/* Search */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden w-[min(40rem,calc(100%-22rem))] -translate-x-1/2 -translate-y-1/2 md:block lg:w-[min(44rem,calc(100%-24rem))]">
+        <div ref={desktopSearchWrapRef} className="pointer-events-auto relative">
+          <form
+            onSubmit={handleInlineSearchSubmit}
+            className="flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/80 px-3.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 focus-within:border-violet-300/90 focus-within:ring-2 focus-within:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-800/75"
+            aria-label="Inline search"
+          >
+            <span className="relative h-4 w-4 shrink-0 text-violet-500">
+              {searchingInline || searchSuggestionsLoading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+            </span>
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onFocus={() => setSearchDropdownOpen(true)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setSearchDropdownOpen(true)
+              }}
+              onKeyDown={(e) => {
+                if (!searchDropdownOpen || searchSuggestions.length === 0) return
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  setActiveSuggestionIndex((i) => (i + 1) % searchSuggestions.length)
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setActiveSuggestionIndex((i) => (i <= 0 ? searchSuggestions.length - 1 : i - 1))
+                }
+              }}
+              placeholder="Search people, channels, or actions"
+              aria-label="Search people, channels, or actions"
+              className="min-w-0 flex-1 bg-transparent text-sm font-medium leading-normal text-slate-700 outline-none placeholder:text-slate-500 dark:text-slate-200 dark:placeholder:text-slate-400"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                aria-label="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
+            <kbd className="hidden rounded-full border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.9))] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-slate-500 shadow-sm dark:border-slate-600 dark:bg-[linear-gradient(180deg,rgba(51,65,85,0.95),rgba(30,41,59,0.9))] dark:text-slate-300 lg:inline">
+              ⌘K
+            </kbd>
+          </form>
+          {renderSearchDropdown(false)}
+        </div>
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1 min-[370px]:gap-1.5 sm:gap-2.5">

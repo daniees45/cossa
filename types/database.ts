@@ -98,6 +98,38 @@ export interface Database {
         }
         Relationships: []
       }
+      site_branding: {
+        Row: {
+          id: number
+          site_title: string
+          site_subtitle: string
+          logo_url: string
+          light_background: string
+          dark_background: string
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          site_title?: string
+          site_subtitle?: string
+          logo_url?: string
+          light_background?: string
+          dark_background?: string
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          site_title?: string
+          site_subtitle?: string
+          logo_url?: string
+          light_background?: string
+          dark_background?: string
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       post_likes: {
         Row: { post_id: string; user_id: string }
         Insert: { post_id: string; user_id: string }

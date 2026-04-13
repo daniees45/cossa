@@ -6,15 +6,17 @@ import { DialogProvider } from '@/components/shared/DialogProvider'
 import { NavigationProgress } from '@/components/shared/NavigationProgress'
 import { DashboardTransitionShell } from '@/components/layout/DashboardTransitionShell'
 import { InitialDashboardSplash } from '@/components/layout/InitialDashboardSplash'
+import { SiteBrandingRuntime } from '@/components/layout/SiteBrandingRuntime'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <RealtimeProvider>
+      <SiteBrandingRuntime />
       <InitialDashboardSplash />
       <NavigationProgress />
       <DialogProvider>
         <div
-          className="flex min-h-dvh overflow-hidden bg-slate-50 dark:bg-slate-950"
+          className="flex min-h-dvh overflow-hidden bg-[var(--site-bg,#f8fafc)] dark:bg-[var(--site-bg-dark,#020617)]"
           style={{ ['--mobile-nav-height' as string]: 'calc(3.75rem + env(safe-area-inset-bottom))' }}
         >
           <Sidebar />

@@ -13,6 +13,7 @@ import {
   Shield,
   ArrowRight,
   Activity,
+  Palette,
 } from 'lucide-react'
 
 export default async function AdminPage() {
@@ -181,6 +182,7 @@ export default async function AdminPage() {
             <QuickAction href="/admin/notifications" icon={Bell} label="Broadcast Alert" description="Targeted push notice" />
             <QuickAction href="/admin/channels" icon={MessageSquare} label="Manage Channels" description="Moderate access and members" />
             <QuickAction href="/admin/gallery" icon={ImageIcon} label="Update Gallery" description="Upload event media" />
+            <QuickAction href="/admin/appearance" icon={Palette} label="Edit Branding" description="Logo, title, and backgrounds" />
           </div>
         </div>
 

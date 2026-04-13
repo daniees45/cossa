@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh, Flag, CalendarDays, ShieldCheck, ExternalLink } from 'lucide-react'
+import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh, Flag, CalendarDays, ShieldCheck, ExternalLink, Repeat2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/shared/Avatar'
@@ -10,7 +10,6 @@ import { timeAgo } from '@/lib/utils/formatDate'
 import { cn } from '@/lib/utils/cn'
 import type { PostWithAuthor } from '@/types/app'
 import { useUser } from '@/lib/hooks/useUser'
-import { CommentsSurface } from '@/components/social/CommentsSurface'
 
 interface PostCardProps {
   post: PostWithAuthor
@@ -31,7 +30,6 @@ export function PostCard({ post, onDeleted, hideOfficialBadge = false }: PostCar
   const [likes, setLikes] = useState(post.likes_count)
   const [bookmarked, setBookmarked] = useState(post.bookmarked_by_me ?? false)
   const [commentsCount, setCommentsCount] = useState(post.comments_count)
-  const [showComments, setShowComments] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showReport, setShowReport] = useState(false)
@@ -41,6 +39,8 @@ export function PostCard({ post, onDeleted, hideOfficialBadge = false }: PostCar
   const [removed, setRemoved] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [sharedPulse, setSharedPulse] = useState(false)
+  const [reposted, setReposted] = useState(false)
+  const [reposting, setReposting] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const firstUrl = extractFirstUrl(post.content)
   const linkHost = (() => {
@@ -132,6 +132,27 @@ export function PostCard({ post, onDeleted, hideOfficialBadge = false }: PostCar
     setSharedPulse(true)
     setTimeout(() => setSharedPulse(false), 420)
     toast.success('Post link ready to share')
+  }
+
+  async function handleRepost() {
+    if (!user || reposting) return
+    setReposting(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('posts').insert({
+        author_id: user.id,
+        type: 'post',
+        content: `Repost from @${post.author.username}\n\n${post.content}\n\nOriginal: ${window.location.origin}/social/${post.id}`,
+        media_urls: post.media_urls ?? null,
+      })
+      if (error) throw error
+      setReposted(true)
+      toast.success('Reposted to your feed')
+    } catch {
+      toast.error('Unable to repost this post right now')
+    } finally {
+      setReposting(false)
+    }
   }
 
   async function submitReport() {
@@ -334,20 +355,18 @@ export function PostCard({ post, onDeleted, hideOfficialBadge = false }: PostCar
             {likes > 0 && <span>{likes}</span>}
           </motion.button>
 
-          <motion.button
-            onClick={() => setShowComments(!showComments)}
-            whileTap={{ scale: 0.94 }}
-            whileHover={{ y: -1 }}
+          <Link
+            href={`/social/${post.id}?comments=1`}
             className="flex min-h-10 items-center gap-1.5 rounded-full px-3 py-2 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
           >
             <motion.span
-              animate={showComments ? { rotate: [0, -6, 6, 0] } : undefined}
+              whileHover={{ rotate: [0, -6, 6, 0] }}
               transition={{ duration: 0.22 }}
             >
               <MessageCircle size={16} />
             </motion.span>
             {commentsCount > 0 && <span>{commentsCount}</span>}
-          </motion.button>
+          </Link>
 
           <Link
             href={`/social/${post.id}`}
@@ -372,6 +391,23 @@ export function PostCard({ post, onDeleted, hideOfficialBadge = false }: PostCar
           </motion.button>
 
           <motion.button
+            onClick={handleRepost}
+            disabled={!user || reposting}
+            whileTap={{ scale: 0.94 }}
+            whileHover={{ y: -1 }}
+            className={cn(
+              'flex min-h-10 items-center gap-1.5 rounded-full px-3 py-2 text-sm transition',
+              reposted
+                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-emerald-700 dark:hover:bg-slate-700/70 dark:hover:text-emerald-300',
+              (!user || reposting) && 'opacity-60'
+            )}
+          >
+            <Repeat2 size={16} />
+            <span>{reposting ? 'Reposting...' : reposted ? 'Reposted' : 'Repost'}</span>
+          </motion.button>
+
+          <motion.button
             onClick={toggleBookmark}
             whileTap={{ scale: 0.94 }}
             whileHover={{ y: -1 }}
@@ -391,18 +427,6 @@ export function PostCard({ post, onDeleted, hideOfficialBadge = false }: PostCar
           </motion.button>
         </div>
       </div>
-
-      {/* Comments section */}
-      <CommentsSurface
-        postId={post.id}
-        postHref={`/social/${post.id}`}
-        initialCommentCount={commentsCount}
-        mode="overlay"
-        open={showComments}
-        autoFocusComposer={showComments}
-        onOpenChange={setShowComments}
-        onCommentAdded={() => setCommentsCount((c) => c + 1)}
-      />
 
       {/* Report modal */}
       <AnimatePresence>

@@ -18,6 +18,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { cn } from '@/lib/utils/cn'
 import { getInitials } from '@/lib/utils/uploadFile'
 import { useChatStore } from '@/lib/stores/chatStore'
+import { useSiteBranding } from '@/lib/hooks/useSiteBranding'
 
 const NAV = [
   { label: 'Feed',          href: '/',           icon: LayoutGrid },
@@ -33,6 +34,7 @@ export function Sidebar() {
   const router = useRouter()
   const { user } = useUser()
   const { dmUnread, channelUnread } = useChatStore()
+  const { branding } = useSiteBranding()
   const totalDmUnread = Object.values(dmUnread).reduce((a, b) => a + b, 0)
   const totalChannelUnread = Object.values(channelUnread).reduce((a, b) => a + b, 0)
   const totalUnread = totalDmUnread + totalChannelUnread
@@ -44,15 +46,19 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="subtle-scrollbar sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto [scrollbar-gutter:stable] border-r border-slate-200 bg-white px-3 py-6 dark:border-slate-800 dark:bg-slate-900 md:flex">
+    <>
+    <div aria-hidden className="hidden w-60 shrink-0 lg:w-64 md:block" />
+    <aside className="subtle-scrollbar fixed bottom-3 left-3 top-3 z-30 hidden w-[calc(15rem-0.75rem)] shrink-0 flex-col overflow-y-auto rounded-2xl border border-slate-200 bg-white/95 px-3 py-6 shadow-[0_18px_44px_rgba(15,23,42,0.12)] backdrop-blur [scrollbar-gutter:stable] dark:border-slate-800 dark:bg-slate-900/95 md:flex lg:w-[calc(16rem-0.75rem)]">
       {/* Logo */}
       <div className="flex items-center gap-3 px-3 mb-8">
-        <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
-          <span className="text-white font-bold text-base">C</span>
+        <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center overflow-hidden">
+          {branding.logoUrl
+            ? <img src={branding.logoUrl} alt="" className="w-full h-full object-cover" />
+            : <span className="text-white font-bold text-base">{(branding.siteTitle[0] || 'C').toUpperCase()}</span>}
         </div>
         <div>
-          <p className="font-bold text-slate-900 dark:text-white text-sm leading-none">COSSA</p>
-          <p className="text-slate-400 text-xs mt-0.5 leading-normal">VVU CS Assoc.</p>
+          <p className="font-bold text-slate-900 dark:text-white text-sm leading-none">{branding.siteTitle}</p>
+          <p className="text-slate-400 text-xs mt-0.5 leading-normal">{branding.siteSubtitle}</p>
         </div>
       </div>
 
@@ -118,5 +124,6 @@ export function Sidebar() {
         )}
       </div>
     </aside>
+    </>
   )
 }
