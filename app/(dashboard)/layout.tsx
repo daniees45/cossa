@@ -11,11 +11,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <RealtimeProvider>
       <NavigationProgress />
       <DialogProvider>
-        <div className="flex min-h-dvh overflow-hidden bg-slate-50 dark:bg-slate-950">
+        <div
+          className="flex min-h-dvh overflow-hidden bg-slate-50 dark:bg-slate-950"
+          style={{ ['--mobile-nav-height' as string]: 'calc(3.75rem + env(safe-area-inset-bottom))' }}
+        >
           <Sidebar />
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             <Topbar />
-            <main className="flex-1 overflow-y-auto pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
+            <main className="flex-1 flex flex-col min-h-0 overflow-y-auto pb-[var(--mobile-nav-height)] md:pb-0">
               <DashboardTransitionShell>{children}</DashboardTransitionShell>
             </main>
           </div>
