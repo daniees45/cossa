@@ -228,7 +228,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     <div className="flex flex-1 min-h-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.08),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(139,92,246,0.08),transparent_45%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(139,92,246,0.14),transparent_45%)]">
       {/* Channel list sidebar */}
       <div className={cn(
-        'w-full md:w-[19.5rem] md:border-r border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 flex flex-col shrink-0 min-h-0 backdrop-blur',
+        'w-full md:w-[15rem] md:min-w-[15rem] md:border-r border-slate-200/80 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 flex flex-col shrink-0 min-h-0 backdrop-blur',
         pathname !== '/chat' && 'hidden md:flex'
       )}>
         <div className="border-b border-slate-100 dark:border-slate-800 bg-[linear-gradient(120deg,rgba(238,242,255,0.95),rgba(236,254,255,0.9))] px-4 py-4 dark:bg-[linear-gradient(120deg,rgba(15,23,42,0.95),rgba(30,41,59,0.9))]">

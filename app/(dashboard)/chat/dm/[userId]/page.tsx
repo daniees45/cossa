@@ -22,6 +22,7 @@ import { Spinner } from '@/components/shared/Spinner'
 import { MobileSlideOver } from '@/components/shared/MobileSlideOver'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  cacheCloudBackupSecret,
   ensureKeyPair,
   encryptMessage,
   decryptMessage,
@@ -59,7 +60,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const { userId } = use(params)
   const { user } = useUser()
   const { clearDmUnread, syncDmReadHighWatermark } = useChatStore()
-  const { confirm } = useDialog()
+  const { confirm, promptText } = useDialog()
 
   const [showSettings, setShowSettings] = useState(false)
   const [mutedDms, setMutedDms] = useState<string[]>(() => {
@@ -149,6 +150,20 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         const { data: encryptedPrivateKeyBlob } = await supabase.rpc('get_encrypted_private_key')
 
         const cloudBackupSecret = resolveCloudBackupSecret(currentUser.id)
+        const resolveMasterPassword = async () => {
+          const input = await promptText({
+            title: 'Unlock encrypted messages',
+            message: 'Enter your encryption password to unlock secure keys for this session.',
+            placeholder: 'Encryption password',
+            confirmLabel: 'Unlock',
+            cancelLabel: 'Cancel',
+            secret: true,
+          })
+          const value = input?.trim() ?? ''
+          if (!value) return null
+          cacheCloudBackupSecret(currentUser.id, value)
+          return value
+        }
 
         const {
           myPrivate,
@@ -166,6 +181,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
           me?.signing_public_key ?? null,
           (encryptedPrivateKeyBlob as string | null) ?? null,
           cloudBackupSecret,
+          { resolveMasterPassword },
         )
 
         if (cancelled) return
@@ -198,7 +214,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
     initE2EE()
     return () => { cancelled = true }
-  }, [user, other])
+  }, [user, other, promptText])
 
   function senderFromCache(senderId: string): Profile | null {
     if (senderProfileCacheRef.current[senderId]) return senderProfileCacheRef.current[senderId]

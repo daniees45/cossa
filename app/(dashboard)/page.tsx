@@ -9,10 +9,11 @@ import { TrendingTopics } from '@/components/social/TrendingTopics'
 import { LayoutGrid, Loader2, Users, Bookmark, Megaphone, ChevronsDown } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
 import type { PostWithAuthor } from '@/types/app'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Component, type ErrorInfo, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils/cn'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 
 const TABS: { id: FeedMode; label: string; icon: React.ReactNode }[] = [
   { id: 'all', label: 'For You', icon: <LayoutGrid size={14} /> },
@@ -26,7 +27,84 @@ const EMPTY_STATE: Record<FeedMode, { title: string; description: string }> = {
   saved: { title: 'No saved posts', description: 'Tap the bookmark icon on any post to save it here for later.' },
 }
 
-export default function FeedPage() {
+type FeedRouteErrorBoundaryProps = {
+  onRecover: () => void
+  children: ReactNode
+}
+
+type FeedRouteErrorBoundaryState = {
+  hasError: boolean
+}
+
+class FeedRouteErrorBoundary extends Component<FeedRouteErrorBoundaryProps, FeedRouteErrorBoundaryState> {
+  state: FeedRouteErrorBoundaryState = { hasError: false }
+
+  static getDerivedStateFromError(): FeedRouteErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: unknown, errorInfo: ErrorInfo): void {
+    console.error('Feed route render crash:', error, errorInfo)
+  }
+
+  private handleRecover = () => {
+    this.setState({ hasError: false })
+    this.props.onRecover()
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <FeedRouteErrorFallback onRecover={this.handleRecover} />
+    }
+    return this.props.children
+  }
+}
+
+function FeedRouteErrorFallback({ onRecover }: { onRecover: () => void }) {
+  const [countdown, setCountdown] = useState(4)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          onRecover()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [onRecover])
+
+  return (
+    <div className="mx-auto flex min-h-[55vh] max-w-2xl flex-col items-center justify-center px-4 text-center">
+      <div className="w-full rounded-3xl border border-red-200/70 bg-white/90 p-6 shadow-sm dark:border-red-900/40 dark:bg-slate-900/90 sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-500">Feed Recovery</p>
+        <h2 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">Feed failed to load</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Trying automatic recovery in {countdown}s. You can also retry now.
+        </p>
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
+          <button
+            onClick={() => window.location.assign('/')}
+            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            Hard reload feed
+          </button>
+          <button
+            onClick={onRecover}
+            className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"
+          >
+            Retry now
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FeedPageContent() {
   const { user } = useUser()
   const qc = useQueryClient()
   const [mode, setMode] = useState<FeedMode>('all')
@@ -244,5 +322,23 @@ export default function FeedPage() {
         </aside>
       </div>
     </div>
+  )
+}
+
+export default function FeedPage() {
+  const [boundaryKey, setBoundaryKey] = useState(0)
+  const qc = useQueryClient()
+  const router = useRouter()
+
+  const handleRecover = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ['feed'] })
+    setBoundaryKey((prev) => prev + 1)
+    router.refresh()
+  }, [qc, router])
+
+  return (
+    <FeedRouteErrorBoundary key={boundaryKey} onRecover={handleRecover}>
+      <FeedPageContent />
+    </FeedRouteErrorBoundary>
   )
 }

@@ -4,22 +4,29 @@
  * Security model:
  *  1. ECDH (P-256) for shared AES-GCM content encryption.
  *  2. ECDSA (P-256) signatures over ciphertext metadata for sender authenticity.
- *  3. Private keys persisted in IndexedDB (legacy localStorage values are migrated).
+ *  3. Private keys are wrapped at rest with a per-user master key.
+ *  4. Master keys are derived via PBKDF2 and persisted in IndexedDB as CryptoKey.
  *  4. Cloud key backup wrapped with PBKDF2(passphrase, random salt), never userId.
  */
 
 const LEGACY_PRIV_KEY_PREFIX = 'cossa_ec_priv_'
-const SESSION_WRAP_SECRET_PREFIX = 'cossa_wrap_secret_'
 const PBKDF2_ITERATIONS = 210_000
 const PBKDF2_SALT_BYTES = 16
 
 const KEY_DB_NAME = 'cossa-crypto-keys'
 const KEY_STORE = 'keys'
+const SECURE_KEY_STORE = 'secure_keys'
 const ECDH_DB_KEY = (userId: string) => `ecdh:${userId}`
 const ECDSA_DB_KEY = (userId: string) => `ecdsa:${userId}`
+const MASTER_KEY_DB_KEY = (userId: string) => `master:${userId}`
+const MASTER_SALT_DB_KEY = (userId: string) => `master-salt:${userId}`
+
+const sessionMasterKeyCache = new Map<string, CryptoKey>()
+const sessionCloudSecretCache = new Map<string, string>()
 
 type CloudWrappedBlobV1 = { v: 1; iv: string; ct: string }
 type CloudWrappedBlobV2 = { v: 2; iv: string; ct: string; salt: string; iter: number }
+type LocalWrappedBlobV1 = { v: 1; iv: string; ct: string; alg: 'AES-GCM-256' }
 type E2EPayloadV2 = {
   e2e: 1
   iv: string
@@ -152,11 +159,14 @@ async function importSigningPrivateKeyJwkString(privateJwkRaw: string): Promise<
 
 function openKeyDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(KEY_DB_NAME, 1)
+    const req = indexedDB.open(KEY_DB_NAME, 2)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(KEY_STORE)) {
         db.createObjectStore(KEY_STORE)
+      }
+      if (!db.objectStoreNames.contains(SECURE_KEY_STORE)) {
+        db.createObjectStore(SECURE_KEY_STORE)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -164,44 +174,160 @@ function openKeyDb(): Promise<IDBDatabase> {
   })
 }
 
-async function idbGet(key: string): Promise<string | null> {
+async function idbGet<T = unknown>(storeName: string, key: string): Promise<T | null> {
   const db = await openKeyDb()
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(KEY_STORE, 'readonly')
-    const store = tx.objectStore(KEY_STORE)
+    const tx = db.transaction(storeName, 'readonly')
+    const store = tx.objectStore(storeName)
     const req = store.get(key)
-    req.onsuccess = () => resolve((req.result as string | undefined) ?? null)
+    req.onsuccess = () => resolve((req.result as T | undefined) ?? null)
     req.onerror = () => reject(req.error)
     tx.oncomplete = () => db.close()
     tx.onerror = () => db.close()
   })
 }
 
-async function idbSet(key: string, value: string): Promise<void> {
+async function idbSet(storeName: string, key: string, value: unknown): Promise<void> {
   const db = await openKeyDb()
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(KEY_STORE, 'readwrite')
-    tx.objectStore(KEY_STORE).put(value, key)
+    const tx = db.transaction(storeName, 'readwrite')
+    tx.objectStore(storeName).put(value, key)
     tx.oncomplete = () => { db.close(); resolve() }
     tx.onerror = () => { db.close(); reject(tx.error) }
   })
+}
+
+async function deriveMasterKey(password: string, salt: Uint8Array, iterations = PBKDF2_ITERATIONS): Promise<CryptoKey> {
+  const passwordBytes = new TextEncoder().encode(password)
+  const keyMaterial = await crypto.subtle.importKey('raw', passwordBytes, 'PBKDF2', false, ['deriveKey'])
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      iterations,
+      salt: toArrayBufferUint8(salt),
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  )
+}
+
+export async function deriveAndPersistMasterKey(userId: string, password: string): Promise<CryptoKey> {
+  const existingSaltB64 = await idbGet<string>(KEY_STORE, MASTER_SALT_DB_KEY(userId))
+  const salt = existingSaltB64 ? b64decode(existingSaltB64) : crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES))
+  if (!existingSaltB64) {
+    await idbSet(KEY_STORE, MASTER_SALT_DB_KEY(userId), b64encode(salt))
+  }
+  const key = await deriveMasterKey(password, salt)
+  await idbSet(SECURE_KEY_STORE, MASTER_KEY_DB_KEY(userId), key)
+  sessionMasterKeyCache.set(userId, key)
+  sessionCloudSecretCache.set(userId, password)
+  return key
+}
+
+export async function loadPersistedMasterKey(userId: string): Promise<CryptoKey | null> {
+  const cached = sessionMasterKeyCache.get(userId)
+  if (cached) return cached
+  const stored = await idbGet<CryptoKey>(SECURE_KEY_STORE, MASTER_KEY_DB_KEY(userId))
+  if (stored) {
+    sessionMasterKeyCache.set(userId, stored)
+    return stored
+  }
+  return null
+}
+
+export async function ensureSessionMasterKey(
+  userId: string,
+  passwordResolver?: () => Promise<string | null>,
+): Promise<CryptoKey | null> {
+  const existing = await loadPersistedMasterKey(userId)
+  if (existing) return existing
+  if (!passwordResolver) return null
+  const password = await passwordResolver()
+  if (!password?.trim()) return null
+  return deriveAndPersistMasterKey(userId, password.trim())
+}
+
+async function wrapJwkRawForLocalStorage(jwkRaw: string, masterKey: CryptoKey): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const ct = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    masterKey,
+    new TextEncoder().encode(jwkRaw),
+  )
+  const blob: LocalWrappedBlobV1 = {
+    v: 1,
+    iv: b64encode(iv),
+    ct: b64encode(new Uint8Array(ct)),
+    alg: 'AES-GCM-256',
+  }
+  return JSON.stringify(blob)
+}
+
+async function unwrapJwkRawFromLocalStorage(blobRaw: string, masterKey: CryptoKey): Promise<string> {
+  const blob = JSON.parse(blobRaw) as LocalWrappedBlobV1
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: b64decode(blob.iv) },
+    masterKey,
+    b64decode(blob.ct),
+  )
+  return new TextDecoder().decode(plain)
+}
+
+function parseLocalWrappedBlob(raw: string): LocalWrappedBlobV1 | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<LocalWrappedBlobV1>
+    if (parsed.v === 1 && typeof parsed.iv === 'string' && typeof parsed.ct === 'string') {
+      return parsed as LocalWrappedBlobV1
+    }
+  } catch {
+    return null
+  }
+  return null
 }
 
 // ─── Private key persistence (IndexedDB with localStorage migration) ─────────
 
 export async function savePrivateKey(userId: string, key: CryptoKey): Promise<void> {
   const jwkRaw = await exportPrivateKeyJwkString(key)
-  await idbSet(ECDH_DB_KEY(userId), jwkRaw)
+  const masterKey = await loadPersistedMasterKey(userId)
+  if (masterKey) {
+    const wrapped = await wrapJwkRawForLocalStorage(jwkRaw, masterKey)
+    await idbSet(KEY_STORE, ECDH_DB_KEY(userId), wrapped)
+    return
+  }
+  await idbSet(KEY_STORE, ECDH_DB_KEY(userId), jwkRaw)
 }
 
 export async function saveSigningPrivateKey(userId: string, key: CryptoKey): Promise<void> {
-  const privateJwk = await crypto.subtle.exportKey('jwk', key)
-  await idbSet(ECDSA_DB_KEY(userId), JSON.stringify(privateJwk))
+  const privateJwkRaw = JSON.stringify(await crypto.subtle.exportKey('jwk', key))
+  const masterKey = await loadPersistedMasterKey(userId)
+  if (masterKey) {
+    const wrapped = await wrapJwkRawForLocalStorage(privateJwkRaw, masterKey)
+    await idbSet(KEY_STORE, ECDSA_DB_KEY(userId), wrapped)
+    return
+  }
+  await idbSet(KEY_STORE, ECDSA_DB_KEY(userId), privateJwkRaw)
 }
 
 export async function loadPrivateKey(userId: string): Promise<CryptoKey | null> {
-  const stored = await idbGet(ECDH_DB_KEY(userId))
+  const stored = await idbGet<string>(KEY_STORE, ECDH_DB_KEY(userId))
   if (stored) {
+    const wrapped = parseLocalWrappedBlob(stored)
+    if (wrapped) {
+      const masterKey = await loadPersistedMasterKey(userId)
+      if (!masterKey) {
+        throw new Error('Master password required to unlock encrypted keys')
+      }
+      try {
+        const jwkRaw = await unwrapJwkRawFromLocalStorage(stored, masterKey)
+        return await importPrivateKeyJwkString(jwkRaw)
+      } catch {
+        return null
+      }
+    }
     try {
       return await importPrivateKeyJwkString(stored)
     } catch {
@@ -213,7 +339,7 @@ export async function loadPrivateKey(userId: string): Promise<CryptoKey | null> 
   if (!legacyRaw) return null
   try {
     const key = await importPrivateKeyJwkString(legacyRaw)
-    await idbSet(ECDH_DB_KEY(userId), legacyRaw)
+    await savePrivateKey(userId, key)
     localStorage.removeItem(LEGACY_PRIV_KEY_PREFIX + userId)
     return key
   } catch {
@@ -222,8 +348,21 @@ export async function loadPrivateKey(userId: string): Promise<CryptoKey | null> 
 }
 
 export async function loadSigningPrivateKey(userId: string): Promise<CryptoKey | null> {
-  const stored = await idbGet(ECDSA_DB_KEY(userId))
+  const stored = await idbGet<string>(KEY_STORE, ECDSA_DB_KEY(userId))
   if (!stored) return null
+  const wrapped = parseLocalWrappedBlob(stored)
+  if (wrapped) {
+    const masterKey = await loadPersistedMasterKey(userId)
+    if (!masterKey) {
+      throw new Error('Master password required to unlock encrypted signing keys')
+    }
+    try {
+      const jwkRaw = await unwrapJwkRawFromLocalStorage(stored, masterKey)
+      return await importSigningPrivateKeyJwkString(jwkRaw)
+    } catch {
+      return null
+    }
+  }
   try {
     return await importSigningPrivateKeyJwkString(stored)
   } catch {
@@ -251,11 +390,12 @@ async function deriveCloudWrapKey(secret: string, salt: Uint8Array, iterations: 
 }
 
 export function resolveCloudBackupSecret(userId: string): string | null {
-  if (typeof window === 'undefined') return null
-  const cacheKey = `${SESSION_WRAP_SECRET_PREFIX}${userId}`
-  const cached = sessionStorage.getItem(cacheKey)
-  if (cached) return cached
-  return null
+  return sessionCloudSecretCache.get(userId) ?? null
+}
+
+export function cacheCloudBackupSecret(userId: string, secret: string): void {
+  if (!secret.trim()) return
+  sessionCloudSecretCache.set(userId, secret.trim())
 }
 
 async function encryptPrivateKeyForCloud(privateKey: CryptoKey, secret: string): Promise<string> {
@@ -426,6 +566,9 @@ export async function ensureKeyPair(
   mySigningPublicKeyB64: string | null = null,
   myEncryptedPrivateKeyBlob: string | null = null,
   cloudBackupSecret: string | null = null,
+  options?: {
+    resolveMasterPassword?: () => Promise<string | null>
+  },
 ): Promise<{
   myPrivate: CryptoKey
   mySigningPrivate: CryptoKey
@@ -435,8 +578,23 @@ export async function ensureKeyPair(
   newSigningPublicKeyB64: string | null
   newEncryptedPrivateKeyBlob: string | null
 }> {
-  let myPrivate = await loadPrivateKey(userId)
-  let mySigningPrivate = await loadSigningPrivateKey(userId)
+  await ensureSessionMasterKey(userId, options?.resolveMasterPassword)
+
+  let myPrivate: CryptoKey | null = null
+  let mySigningPrivate: CryptoKey | null = null
+  try {
+    myPrivate = await loadPrivateKey(userId)
+    mySigningPrivate = await loadSigningPrivateKey(userId)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    const needsMaster = /Master password required/i.test(message)
+    if (!needsMaster || !options?.resolveMasterPassword) {
+      throw error
+    }
+    await ensureSessionMasterKey(userId, options.resolveMasterPassword)
+    myPrivate = await loadPrivateKey(userId)
+    mySigningPrivate = await loadSigningPrivateKey(userId)
+  }
   let newPublicKeyB64: string | null = null
   let newSigningPublicKeyB64: string | null = null
   let newEncryptedPrivateKeyBlob: string | null = null

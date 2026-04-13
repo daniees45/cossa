@@ -4,8 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/lib/stores/authStore'
 import type { Profile } from '@/types/app'
 
-// Global flag to prevent concurrent auth fetches
-let isInitialized = false
+// Global promise to prevent concurrent auth fetches
 let initPromise: Promise<void> | null = null
 
 export function useUser() {
@@ -14,8 +13,8 @@ export function useUser() {
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    // If already have user or already initialized, skip
-    if (user || isInitialized) {
+    // If already have user, skip fetch for this mount.
+    if (user) {
       setLoading(false)
       return
     }
@@ -33,7 +32,6 @@ export function useUser() {
     // Initialize auth
     initPromise = (async () => {
       try {
-        isInitialized = true
         const supabase = createClient()
         const { data: { user: authUser }, error } = await supabase.auth.getUser()
         

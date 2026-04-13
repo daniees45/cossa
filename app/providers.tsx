@@ -1,6 +1,6 @@
 'use client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/lib/context/ThemeProvider'
 
@@ -13,6 +13,28 @@ export function Providers({ children }: { children: React.ReactNode }) {
       },
     },
   }))
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!('serviceWorker' in navigator)) return
+
+    void (async () => {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map((reg) => reg.unregister()))
+      } catch {
+        // best-effort cleanup only
+      }
+
+      if (!('caches' in window)) return
+      try {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((key) => caches.delete(key)))
+      } catch {
+        // best-effort cleanup only
+      }
+    })()
+  }, [])
 
   return (
     <ThemeProvider>
