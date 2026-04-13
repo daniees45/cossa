@@ -15,6 +15,7 @@ import { useSearchParams } from 'next/navigation'
 interface PostCardProps {
   post: PostWithAuthor
   onDeleted?: (id: string) => void
+  hideOfficialBadge?: boolean
 }
 
 type ReportReason = 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other'
@@ -24,7 +25,7 @@ function extractFirstUrl(content: string): string | null {
   return match?.[0] ?? null
 }
 
-export function PostCard({ post, onDeleted }: PostCardProps) {
+export function PostCard({ post, onDeleted, hideOfficialBadge = false }: PostCardProps) {
   const { user } = useUser()
   const [liked, setLiked] = useState(post.liked_by_me ?? false)
   const [likes, setLikes] = useState(post.likes_count)
@@ -169,7 +170,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
           whileHover={{ y: -2 }}
           whileTap={{ scale: 0.995 }}
-          className="overflow-hidden rounded-[1.7rem] border border-slate-200/80 bg-white/96 shadow-[0_14px_38px_rgba(15,23,42,0.06)] backdrop-blur transition-shadow hover:shadow-[0_20px_44px_rgba(15,23,42,0.1)] dark:border-slate-700/70 dark:bg-slate-800/96"
+          className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/96 shadow-[0_14px_38px_rgba(15,23,42,0.06)] backdrop-blur transition-shadow hover:shadow-[0_20px_44px_rgba(15,23,42,0.1)] dark:border-slate-700/70 dark:bg-slate-800/96"
         >
       {/* Pinned banner */}
       {post.pinned && (
@@ -206,7 +207,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="truncate text-sm font-semibold leading-none text-slate-900 dark:text-white">{post.author.full_name}</p>
-                {['admin', 'super_admin'].includes(post.author.role) && (
+                {!hideOfficialBadge && ['admin', 'super_admin'].includes(post.author.role) && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
                     <ShieldCheck size={10} /> Official
                   </span>
@@ -312,13 +313,13 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
         )}
 
         {/* Actions */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 pt-3 dark:border-slate-700">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 border-t border-slate-100 pt-3 dark:border-slate-700">
           <motion.button
             onClick={toggleLike}
             whileTap={{ scale: 0.92 }}
             whileHover={{ y: -1 }}
             className={cn(
-              'flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition',
+              'flex min-h-10 items-center gap-1.5 rounded-full px-3 py-2 text-sm transition',
               liked ? 'bg-red-50 text-red-500 dark:bg-red-950/40' : 'text-slate-500 hover:bg-slate-100 hover:text-red-500 dark:hover:bg-slate-700/70'
             )}
           >
@@ -337,7 +338,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             onClick={() => setShowComments(!showComments)}
             whileTap={{ scale: 0.94 }}
             whileHover={{ y: -1 }}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
+            className="flex min-h-10 items-center gap-1.5 rounded-full px-3 py-2 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
           >
             <motion.span
               animate={showComments ? { rotate: [0, -6, 6, 0] } : undefined}
@@ -350,7 +351,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
           <Link
             href={`/social/${post.id}`}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-700/70"
+            className="flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200/80 px-3 py-2 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-violet-600 dark:border-slate-700 dark:hover:bg-slate-700/70"
           >
             <Reply size={16} />
             <span>Thread</span>
@@ -360,7 +361,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             onClick={handleShare}
             whileTap={{ scale: 0.94 }}
             whileHover={{ y: -1 }}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
+            className="flex min-h-10 items-center gap-1.5 rounded-full px-3 py-2 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-cyan-700 dark:hover:bg-slate-700/70 dark:hover:text-cyan-300"
           >
             <motion.span
               animate={sharedPulse ? { x: [0, 2, -2, 2, 0], scale: [1, 1.08, 1] } : undefined}
@@ -375,7 +376,7 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             whileTap={{ scale: 0.94 }}
             whileHover={{ y: -1 }}
             className={cn(
-              'ml-auto flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition',
+              'ml-auto flex min-h-10 items-center gap-1.5 rounded-full px-3 py-2 text-sm transition',
               bookmarked ? 'bg-violet-50 text-violet-600 dark:bg-violet-950/40' : 'text-slate-500 hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-700/70'
             )}
           >
@@ -500,11 +501,91 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
 
 type CommentRow = {
   id: string
+  author_id?: string
   content: string
   created_at: string
   parent_id: string | null
-  author: { username: string; full_name: string; avatar_url: string | null }
+  author: CommentAuthor
+  optimistic?: boolean
   replies?: CommentRow[]
+}
+
+type CommentAuthor = {
+  username: string
+  full_name: string
+  avatar_url: string | null
+}
+
+type RealtimeCommentInsertRow = {
+  id: string
+  content: string
+  created_at: string
+  parent_id: string | null
+  author_id: string
+}
+
+function hasCommentInTree(tree: CommentRow[], commentId: string): boolean {
+  for (const node of tree) {
+    if (node.id === commentId) return true
+    if (node.replies?.length && hasCommentInTree(node.replies, commentId)) return true
+  }
+  return false
+}
+
+function collectAuthorsFromTree(tree: CommentRow[], out: Record<string, CommentAuthor>) {
+  for (const node of tree) {
+    if (node.author_id) {
+      out[node.author_id] = node.author
+    }
+    if (node.replies?.length) collectAuthorsFromTree(node.replies, out)
+  }
+}
+
+function addCommentToTree(tree: CommentRow[], comment: CommentRow): CommentRow[] {
+  if (!comment.parent_id) return [comment, ...tree]
+
+  let attached = false
+
+  function attach(nodes: CommentRow[]): CommentRow[] {
+    return nodes.map((node) => {
+      if (node.id === comment.parent_id) {
+        attached = true
+        return { ...node, replies: [...(node.replies ?? []), comment] }
+      }
+      if (!node.replies?.length) return node
+      return { ...node, replies: attach(node.replies) }
+    })
+  }
+
+  const next = attach(tree)
+  return attached ? next : [comment, ...next]
+}
+
+function removeCommentFromTree(tree: CommentRow[], commentId: string): CommentRow[] {
+  return tree
+    .filter((node) => node.id !== commentId)
+    .map((node) => ({
+      ...node,
+      replies: node.replies ? removeCommentFromTree(node.replies, commentId) : node.replies,
+    }))
+}
+
+function replaceCommentInTree(tree: CommentRow[], tempId: string, nextComment: CommentRow): CommentRow[] {
+  return tree.map((node) => {
+    if (node.id === tempId) return nextComment
+    if (!node.replies?.length) return node
+    return { ...node, replies: replaceCommentInTree(node.replies, tempId, nextComment) }
+  })
+}
+
+function replaceCommentAuthorInTree(tree: CommentRow[], commentId: string, author: CommentAuthor): CommentRow[] {
+  return tree.map((node) => {
+    if (node.id === commentId) {
+      return { ...node, author }
+    }
+    if (!node.replies?.length) return node
+    return { ...node, replies: replaceCommentAuthorInTree(node.replies, commentId, author) }
+  })
 }
 
 function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentAdded?: () => void }) {
@@ -522,12 +603,30 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const typingBroadcastAtRef = useRef(0)
   const typingChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
+  const commentsRef = useRef<CommentRow[]>([])
+  const authorCacheRef = useRef<Record<string, CommentAuthor>>({})
   // Track IDs submitted by current user to avoid double-counting via realtime
   const submittedRef = useRef(new Set<string>())
   const onCommentAddedRef = useRef(onCommentAdded)
   const highlightedCommentId = searchParams.get('comment') || searchParams.get('commentId') || searchParams.get('c')
 
   useEffect(() => { onCommentAddedRef.current = onCommentAdded }, [onCommentAdded])
+
+  useEffect(() => {
+    commentsRef.current = comments
+    const nextCache: Record<string, CommentAuthor> = { ...authorCacheRef.current }
+    collectAuthorsFromTree(comments, nextCache)
+    authorCacheRef.current = nextCache
+  }, [comments])
+
+  useEffect(() => {
+    if (!user) return
+    authorCacheRef.current[user.id] = {
+      username: user.username,
+      full_name: user.full_name,
+      avatar_url: user.avatar_url,
+    }
+  }, [user])
 
   useEffect(() => {
     const autosize = (el: HTMLTextAreaElement | null, maxHeight: number) => {
@@ -574,12 +673,56 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
         async (payload) => {
-          const newId = (payload.new as { id: string }).id
-          await loadComments()
-          if (!submittedRef.current.has(newId)) {
-            onCommentAddedRef.current?.()
+          const row = payload.new as RealtimeCommentInsertRow
+          const newId = row.id
+
+          // Own comments are already in local state via optimistic insert + server replace.
+          // Skip full tree refetch to avoid redundant network work.
+          if (submittedRef.current.has(newId)) {
+            submittedRef.current.delete(newId)
+            return
           }
-          submittedRef.current.delete(newId)
+
+          if (hasCommentInTree(commentsRef.current, newId)) {
+            return
+          }
+
+          const cachedAuthor = authorCacheRef.current[row.author_id]
+          const realtimeComment: CommentRow = {
+            id: row.id,
+            author_id: row.author_id,
+            content: row.content,
+            created_at: row.created_at,
+            parent_id: row.parent_id,
+            author: cachedAuthor ?? {
+              username: 'user',
+              full_name: 'User',
+              avatar_url: null,
+            },
+            replies: [],
+          }
+
+          setComments((current) => addCommentToTree(current, realtimeComment))
+
+          if (!cachedAuthor) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('username, full_name, avatar_url')
+              .eq('id', row.author_id)
+              .single()
+
+            if (profile) {
+              const author: CommentAuthor = {
+                username: profile.username,
+                full_name: profile.full_name,
+                avatar_url: profile.avatar_url,
+              }
+              authorCacheRef.current[row.author_id] = author
+              setComments((current) => replaceCommentAuthorInTree(current, row.id, author))
+            }
+          }
+
+          onCommentAddedRef.current?.()
         }
       )
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
@@ -649,25 +792,55 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!text.trim() || !user) return
+
+    const trimmed = text.trim()
+    const currentReplyTarget = replyingTo
+    const tempId = `temp-${Date.now()}`
+    const optimisticComment: CommentRow = {
+      id: tempId,
+      author_id: user.id,
+      content: trimmed,
+      created_at: new Date().toISOString(),
+      parent_id: currentReplyTarget?.id ?? null,
+      author: {
+        username: user.username,
+        full_name: user.full_name,
+        avatar_url: user.avatar_url,
+      },
+      optimistic: true,
+      replies: [],
+    }
+
+    setComments((current) => addCommentToTree(current, optimisticComment))
+    setText('')
+    setReplyingTo(null)
+    setMobileInputFocused(false)
+    broadcastTyping(false)
+    onCommentAdded?.()
+
     const supabase = createClient()
     const { data, error } = await supabase
       .from('post_comments')
       .insert({
         post_id: postId,
         author_id: user.id,
-        content: text.trim(),
-        parent_id: replyingTo?.id ?? null,
+        content: trimmed,
+        parent_id: currentReplyTarget?.id ?? null,
       })
-      .select('id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
+      .select('id, author_id, content, created_at, parent_id, author:profiles!author_id(username, full_name, avatar_url)')
       .single()
-    if (!error && data) {
-      const newComment = data as unknown as CommentRow
-      submittedRef.current.add(newComment.id)
-      setText('')
-      setReplyingTo(null)
-      broadcastTyping(false)
-      onCommentAdded?.()
+
+    if (error || !data) {
+      setComments((current) => removeCommentFromTree(current, tempId))
+      setText(trimmed)
+      setReplyingTo(currentReplyTarget)
+      toast.error('Failed to send comment. Please try again.')
+      return
     }
+
+    const newComment = data as unknown as CommentRow
+    submittedRef.current.add(newComment.id)
+    setComments((current) => replaceCommentInTree(current, tempId, newComment))
   }
 
   return (
@@ -878,10 +1051,13 @@ function CommentItem({ comment, onReply, depth = 0, highlightedCommentId }: {
         <div className={cn(
           'rounded-2xl border border-slate-200/80 bg-white/95 px-2.5 py-1.5 shadow-sm transition dark:border-slate-700 dark:bg-slate-800/90 sm:px-3 sm:py-2',
           depth > 0 && 'relative before:absolute before:-left-3 before:top-2 before:h-[calc(100%-8px)] before:w-px before:bg-slate-200 dark:before:bg-slate-700',
+          comment.optimistic && 'opacity-80',
           highlightPulse && 'ring-2 ring-cyan-300/70 dark:ring-cyan-700/70'
         )}>
           <p className="text-[11px] font-semibold text-slate-800 dark:text-white sm:text-xs">{comment.author.full_name}</p>
-          <p className="mt-0.5 text-[10px] text-slate-400">@{comment.author.username} · {timeAgo(comment.created_at)}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">
+            @{comment.author.username} · {comment.optimistic ? 'Sending...' : timeAgo(comment.created_at)}
+          </p>
           <p className="mt-1 break-words text-[13px] leading-5 text-slate-700 dark:text-slate-200 sm:text-sm sm:leading-6">{comment.content}</p>
         </div>
         <div className="ml-1 mt-0.5 flex items-center gap-2.5 sm:mt-1 sm:gap-3">

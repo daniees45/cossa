@@ -120,49 +120,36 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-3 py-4 sm:px-4 sm:py-6 lg:px-6">
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-        <div className="relative h-36 overflow-hidden bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-500 sm:h-44">
+        <div className="relative h-32 overflow-hidden bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-500 sm:h-44 md:h-48">
           {profile.banner_url && (
-            <img src={profile.banner_url} alt="" className="h-full w-full object-cover" />
+            <img src={profile.banner_url} alt="" className="h-full w-full object-cover object-[center_30%]" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/10 to-transparent" />
         </div>
 
         <div className="relative px-4 pb-5 sm:px-6 sm:pb-6">
-          <div className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end sm:justify-between">
+          <div className="-mt-7 flex flex-col gap-4 sm:-mt-11 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex min-w-0 items-end gap-3 sm:gap-4">
               <div className="rounded-2xl border-4 border-white dark:border-slate-800">
                 <Avatar src={profile.avatar_url} name={profile.full_name} size="xl" />
               </div>
-              <div className="min-w-0 pb-0.5">
-                <h1 className="truncate text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">{profile.full_name}</h1>
-                <p className="truncate text-sm text-slate-400">@{profile.username}</p>
+              <div className="min-w-0 pb-1.5">
+                <h1 className="break-words text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">{profile.full_name}</h1>
+                <p className="break-all text-sm text-slate-400">@{profile.username}</p>
               </div>
             </div>
-
-            <button
-              onClick={async () => {
-                const url = `${window.location.origin}/profile/${profile.username}`
-                if (navigator.share) {
-                  try { await navigator.share({ title: profile.full_name, url }) } catch { /* cancelled */ }
-                } else {
-                  await navigator.clipboard.writeText(url)
-                  toast.success('Profile link copied!')
-                }
-              }}
-              className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-700 dark:text-slate-300"
-              title="Share profile"
-            >
-              <Share2 size={15} />
-              Share
-            </button>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {profile.level && <Badge variant="info">Level {profile.level}</Badge>}
             {profile.role !== 'student' && (
-              <Badge variant={profile.role === 'super_admin' ? 'danger' : 'warning'}>
-                {profile.role.replace('_', ' ')}
-              </Badge>
+              profile.role === 'super_admin' ? (
+                <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-200">
+                  super admin
+                </span>
+              ) : (
+                <Badge variant="warning">{profile.role.replace('_', ' ')}</Badge>
+              )
             )}
             {profile.department && (
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 dark:bg-slate-700/70 dark:text-slate-300">
@@ -172,8 +159,10 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             )}
           </div>
 
-          {profile.bio && (
+          {profile.bio ? (
             <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{profile.bio}</p>
+          ) : (
+            <p className="mt-3 text-sm italic text-slate-400">No bio added yet.</p>
           )}
 
           <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
@@ -192,10 +181,25 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           </div>
 
           {isMe && (
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                onClick={async () => {
+                  const url = `${window.location.origin}/profile/${profile.username}`
+                  if (navigator.share) {
+                    try { await navigator.share({ title: profile.full_name, url }) } catch { /* cancelled */ }
+                  } else {
+                    await navigator.clipboard.writeText(url)
+                    toast.success('Profile link copied!')
+                  }
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-700 dark:text-slate-300"
+              >
+                <Share2 size={15} />
+                Share
+              </button>
               <button
                 onClick={() => router.push('/profile/edit')}
-                className="inline-flex flex-1 items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-700 dark:text-slate-300"
+                className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-700 dark:text-slate-300"
               >
                 Edit Profile
               </button>
@@ -203,17 +207,32 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           )}
 
           {!isMe && me && (
-            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <button
+                onClick={async () => {
+                  const url = `${window.location.origin}/profile/${profile.username}`
+                  if (navigator.share) {
+                    try { await navigator.share({ title: profile.full_name, url }) } catch { /* cancelled */ }
+                  } else {
+                    await navigator.clipboard.writeText(url)
+                    toast.success('Profile link copied!')
+                  }
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-700 dark:text-slate-300"
+              >
+                <Share2 size={15} />
+                Share
+              </button>
               <button
                 onClick={() => toggleFollow()}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-700 dark:text-slate-300"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-700 dark:text-slate-300"
               >
                 {isFollowing ? <UserMinus size={15} /> : <UserPlus size={15} />}
                 {isFollowing ? 'Unfollow' : 'Follow'}
               </button>
               <button
                 onClick={() => router.push(`/chat/dm/${profile.id}`)}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500"
               >
                 <MessageSquare size={15} />
                 Message
@@ -239,7 +258,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           />
         ) : (
           <div className="space-y-4">
-            {posts.map((p) => <PostCard key={p.id} post={p} />)}
+            {posts.map((p) => <PostCard key={p.id} post={p} hideOfficialBadge={isMe} />)}
           </div>
         )}
       </section>

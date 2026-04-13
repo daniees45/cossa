@@ -29,6 +29,7 @@ export function Topbar() {
   const [open, setOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [showMobileHelper, setShowMobileHelper] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -81,6 +82,45 @@ export function Topbar() {
     main?.focus({ preventScroll: true })
   }, [pathname])
 
+  // Mobile helper row: show once, auto-dismiss after a few seconds,
+  // and permanently hide after first user interaction.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!window.matchMedia('(max-width: 639px)').matches) return
+
+    const key = 'topbar-mobile-helper-dismissed'
+    try {
+      if (window.localStorage.getItem(key) === '1') return
+    } catch {
+      // ignore storage availability issues
+    }
+
+    setShowMobileHelper(true)
+
+    const dismiss = () => {
+      setShowMobileHelper(false)
+      try {
+        window.localStorage.setItem(key, '1')
+      } catch {
+        // ignore storage availability issues
+      }
+    }
+
+    const autoTimer = window.setTimeout(dismiss, 5200)
+    const onFirstInteraction = () => dismiss()
+
+    window.addEventListener('pointerdown', onFirstInteraction, { once: true })
+    window.addEventListener('keydown', onFirstInteraction, { once: true })
+    window.addEventListener('touchstart', onFirstInteraction, { once: true })
+
+    return () => {
+      window.clearTimeout(autoTimer)
+      window.removeEventListener('pointerdown', onFirstInteraction)
+      window.removeEventListener('keydown', onFirstInteraction)
+      window.removeEventListener('touchstart', onFirstInteraction)
+    }
+  }, [])
+
   async function handleMarkAllRead() {
     markAllRead()
     if (!user) return
@@ -99,9 +139,9 @@ export function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 min-w-0 items-center gap-1.5 border-b border-slate-200 bg-white/80 px-2.5 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 sm:gap-3 sm:px-4 md:px-6">
+    <header className="sticky top-0 z-40 flex h-14 min-w-0 items-center gap-2 border-b border-slate-200/90 bg-white/90 px-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/88 sm:gap-3 sm:px-4 md:px-6">
       {/* COSSA logo - mobile only */}
-      <div className="mr-1.5 flex min-w-0 items-center gap-2 md:hidden sm:mr-2">
+      <div className="mr-0.5 flex min-w-0 items-center gap-2 md:hidden sm:mr-1">
         <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
           <span className="text-white font-bold text-xs">C</span>
         </div>
@@ -120,11 +160,11 @@ export function Topbar() {
 
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
 
-      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2.5">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
         <button
           onClick={() => setSearchOpen(true)}
           aria-label="Open search"
-          className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden"
+          className="rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden"
           title="Search"
         >
           <Search size={18} />
@@ -136,7 +176,7 @@ export function Topbar() {
           <button
             onClick={() => setOpen(!open)}
             aria-label={open ? 'Close notifications' : 'Open notifications'}
-            className="relative p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            className="relative rounded-xl p-2.5 transition hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <Bell size={20} className="text-slate-600 dark:text-slate-300" />
             {unreadCount > 0 && (
@@ -190,6 +230,8 @@ export function Topbar() {
           )}
         </div>
 
+        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+
         {/* Avatar */}
         {user && (
           <div className="relative" ref={userMenuRef}>
@@ -228,6 +270,16 @@ export function Topbar() {
                     Edit profile
                   </Link>
 
+                  {user.role === 'super_admin' && (
+                    <Link
+                      href="/admin"
+                      className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700"
+                    >
+                      <Settings size={14} />
+                      Admin settings
+                    </Link>
+                  )}
+
                   <button
                     onClick={handleSignOut}
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-red-600 transition hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -241,6 +293,18 @@ export function Topbar() {
           </div>
         )}
       </div>
+
+      {showMobileHelper && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute right-2 top-full mt-1.5 grid grid-cols-4 gap-1 rounded-xl border border-slate-200/80 bg-white/85 px-2 py-1 text-[10px] font-medium text-slate-500 shadow-sm backdrop-blur sm:hidden"
+        >
+          <span className="text-center">Search</span>
+          <span className="text-center">Theme</span>
+          <span className="text-center">Alerts</span>
+          <span className="text-center">Account</span>
+        </div>
+      )}
     </header>
   )
 }
@@ -251,7 +315,7 @@ function ThemeToggle() {
     <button
       onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
       aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+      className="rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
       title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}

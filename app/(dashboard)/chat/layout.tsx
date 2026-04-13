@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Hash, Plus, X, Users, ChevronRight, Lock } from 'lucide-react'
 import { Avatar } from '@/components/shared/Avatar'
 import { ChannelAvatar } from '@/components/shared/ChannelAvatar'
@@ -252,38 +253,74 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
             </div>
             {channels?.map((ch) => {
               const unread = totalChannelUnreadFor(ch.id)
-              return <button
-                key={ch.id}
-                onClick={() => handleChannelClick(ch)}
-                className={cn(
-                  'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border',
-                  pathname === `/chat/${ch.id}`
-                    ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 shadow-sm'
-                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                )}
-              >
-                <ChannelAvatar
-                  name={ch.name}
-                  avatar_url={ch.avatar_url}
-                  emoji_icon={ch.emoji_icon}
-                  color_hex={ch.color_hex ?? '#7c3aed'}
-                  type={ch.type}
-                  size="sm"
-                  className="shrink-0"
-                />
-                <span className="truncate flex-1">{ch.name}</span>
-                {ch.type === 'private' && (
-                  <Lock size={12} className="text-amber-500 shrink-0" />
-                )}
-                {unread > 0 && pathname !== `/chat/${ch.id}` && (
-                  <span className="min-w-[18px] h-[18px] rounded-full bg-violet-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
-                    {unread > 99 ? '99+' : unread}
-                  </span>
-                )}
-                {myChannelIds && !myChannelIds.has(ch.id) && pathname !== `/chat/${ch.id}` && (
-                  <span className="text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 font-medium px-1.5 py-0.5 rounded-full shrink-0">Join</span>
-                )}
-              </button>
+              const isActive = pathname === `/chat/${ch.id}`
+              const isMember = !!myChannelIds?.has(ch.id)
+              const itemClass = cn(
+                'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border touch-manipulation',
+                isActive
+                  ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 shadow-sm'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 md:hover:bg-slate-100 dark:md:hover:bg-slate-800'
+              )
+
+              if (isMember || isActive) {
+                return (
+                  <Link
+                    key={ch.id}
+                    href={`/chat/${ch.id}`}
+                    onClick={() => setChannelUnread(ch.id, 0)}
+                    className={itemClass}
+                  >
+                    <ChannelAvatar
+                      name={ch.name}
+                      avatar_url={ch.avatar_url}
+                      emoji_icon={ch.emoji_icon}
+                      color_hex={ch.color_hex ?? '#7c3aed'}
+                      type={ch.type}
+                      size="sm"
+                      className="shrink-0"
+                    />
+                    <span className="truncate flex-1">{ch.name}</span>
+                    {ch.type === 'private' && (
+                      <Lock size={12} className="text-amber-500 shrink-0" />
+                    )}
+                    {unread > 0 && !isActive && (
+                      <span className="min-w-[18px] h-[18px] rounded-full bg-violet-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
+                        {unread > 99 ? '99+' : unread}
+                      </span>
+                    )}
+                  </Link>
+                )
+              }
+
+              return (
+                <button
+                  key={ch.id}
+                  onClick={() => handleChannelClick(ch)}
+                  className={itemClass}
+                >
+                  <ChannelAvatar
+                    name={ch.name}
+                    avatar_url={ch.avatar_url}
+                    emoji_icon={ch.emoji_icon}
+                    color_hex={ch.color_hex ?? '#7c3aed'}
+                    type={ch.type}
+                    size="sm"
+                    className="shrink-0"
+                  />
+                  <span className="truncate flex-1">{ch.name}</span>
+                  {ch.type === 'private' && (
+                    <Lock size={12} className="text-amber-500 shrink-0" />
+                  )}
+                  {unread > 0 && !isActive && (
+                    <span className="min-w-[18px] h-[18px] rounded-full bg-violet-500 text-white text-[10px] font-bold flex items-center justify-center px-1 shrink-0">
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
+                  {!isActive && (
+                    <span className="text-[10px] bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 font-medium px-1.5 py-0.5 rounded-full shrink-0">Join</span>
+                  )}
+                </button>
+              )
             })}
           </div>
 
@@ -345,14 +382,15 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
               const unread = totalUnreadFor(u.id)
               const isActive = pathname === `/chat/dm/${u.id}`
               return (
-                <button
+                <Link
                   key={u.id}
-                  onClick={() => navigateToDm(u.id)}
+                  href={`/chat/dm/${u.id}`}
+                  onClick={() => clearDmUnread(u.id)}
                   className={cn(
-                      'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border',
+                      'w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-sm transition text-left border touch-manipulation',
                     isActive
                         ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 shadow-sm'
-                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      : 'border-transparent text-slate-600 dark:text-slate-400 md:hover:bg-slate-100 dark:md:hover:bg-slate-800'
                   )}
                 >
                   <Avatar src={u.avatar_url} name={u.full_name} size="sm" />
@@ -362,7 +400,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
                       {unread > 99 ? '99+' : unread}
                     </span>
                   )}
-                </button>
+                </Link>
               )
             })}
           </div>

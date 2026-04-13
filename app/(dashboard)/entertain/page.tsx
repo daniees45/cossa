@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
@@ -7,7 +8,7 @@ import { Badge } from '@/components/shared/Badge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import {
   Tv2, Calendar, MapPin, Users, Image as ImageIcon, CheckCircle2,
-  Search, X, Share2, ChevronLeft, ChevronRight, Clock,
+  Search, X, Share2, ChevronLeft, ChevronRight, Clock, Sparkles, BellRing, Film,
 } from 'lucide-react'
 import { formatEventDate } from '@/lib/utils/formatDate'
 import { cn } from '@/lib/utils/cn'
@@ -276,73 +277,133 @@ export default function EntertainPage() {
 
   const filteredUpcoming = applyFilter(upcoming)
   const filteredPast     = applyFilter(past)
+  const featuredEvent = upcoming[0] ?? null
+  const activeTabIndex = tab === 'events' ? 0 : 1
 
   return (
-    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 dark:text-white">Entertainment</h1>
-        <p className="text-slate-500 text-sm mt-1">Events, activities, and media gallery</p>
-      </div>
+    <div className="mx-auto max-w-4xl space-y-5 px-3 py-4 sm:px-4 sm:py-6">
+      <motion.div
+        className="space-y-4"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-700/80 dark:text-cyan-300/80">Content Hub</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:text-4xl">Entertainment</h1>
+          <p className="mt-1 text-sm text-slate-500">Events, activities, and gallery highlights in one place.</p>
+        </div>
+
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-[linear-gradient(145deg,rgba(255,255,255,0.95),rgba(240,249,255,0.9))] p-4 shadow-[0_14px_34px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-[linear-gradient(145deg,rgba(30,41,59,0.9),rgba(15,23,42,0.95))] sm:p-5">
+          <div className="absolute -right-10 -top-12 h-40 w-40 rounded-full bg-cyan-300/30 blur-3xl dark:bg-cyan-500/20" />
+          <div className="absolute -bottom-14 -left-10 h-44 w-44 rounded-full bg-violet-300/30 blur-3xl dark:bg-violet-500/20" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-medium text-cyan-700 shadow-sm dark:bg-slate-800/80 dark:text-cyan-300">
+                <Sparkles size={12} /> Featured
+              </p>
+              {featuredEvent ? (
+                <>
+                  <h2 className="mt-2 text-lg font-bold text-slate-900 dark:text-white sm:text-xl">{featuredEvent.title}</h2>
+                  <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{featuredEvent.description ?? 'Next major campus moment. RSVP and invite your friends.'}</p>
+                  <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <Calendar size={13} /> {formatEventDate(featuredEvent.event_date)}
+                    {featuredEvent.location && <><span className="mx-1">•</span><MapPin size={13} /> {featuredEvent.location}</>}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="mt-2 text-lg font-bold text-slate-900 dark:text-white sm:text-xl">Next Major Event</h2>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Fresh event drops are coming soon. Turn on alerts so you never miss first access.</p>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => toast.success('We will notify you when new events drop')}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(124,58,237,0.35)] transition hover:bg-violet-500 active:scale-95"
+            >
+              <BellRing size={15} /> Notify me
+            </button>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Tabs */}
-      <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 overflow-x-auto">
+      <motion.div
+        className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/90 p-1.5 shadow-sm dark:border-slate-700 dark:bg-slate-800/90"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div
+          className="pointer-events-none absolute top-1.5 bottom-1.5 w-[calc(50%-0.5rem)] rounded-xl bg-violet-600 shadow-[0_10px_22px_rgba(124,58,237,0.3)] transition-transform duration-300"
+          style={{ transform: `translateX(${activeTabIndex * 100}%)`, viewTransitionName: 'entertainment-tab-pill' }}
+        />
+        <div className="relative z-[1] flex gap-1 overflow-x-auto">
         {(['events', 'gallery'] as const).map((t) => (
           <button
             key={t}
             onClick={() => { setTab(t); setSearch('') }}
+            style={{ viewTransitionName: `entertainment-tab-${t}` }}
             className={cn(
-              'flex-1 min-w-[8.5rem] py-2 rounded-lg text-sm font-medium transition whitespace-nowrap',
+              'flex-1 min-w-[8.5rem] rounded-xl py-2.5 text-sm font-semibold transition whitespace-nowrap active:scale-95',
               tab === t
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',
+                ? 'text-white'
+                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
             )}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
-      </div>
+        </div>
+      </motion.div>
 
       {/* ── EVENTS ──────────────────────────────────────────────────────── */}
       {tab === 'events' && (
         <>
-          {/* Search */}
-          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2.5">
-            <Search size={15} className="text-slate-400 shrink-0" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search events…"
-              className="bg-transparent text-sm text-slate-700 dark:text-slate-200 placeholder-slate-400 outline-none flex-1"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className="text-slate-400 hover:text-slate-600">
-                <X size={13} />
-              </button>
-            )}
-          </div>
+          <motion.div
+            className="sticky top-[calc(var(--topbar-height,3.5rem)+0.5rem)] z-10 space-y-2 rounded-2xl border border-slate-200/70 bg-white/75 p-3 backdrop-blur-md dark:border-slate-700/70 dark:bg-slate-900/65"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, delay: 0.09, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="flex items-center gap-2 rounded-2xl bg-slate-100/90 px-3 py-2.5 dark:bg-slate-800/90">
+              <Search size={15} className="shrink-0 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search events, places, or topics"
+                className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-200"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="rounded-lg p-1 text-slate-400 transition hover:bg-white hover:text-slate-600 dark:hover:bg-slate-700" aria-label="Clear search">
+                  <X size={13} />
+                </button>
+              )}
+            </div>
 
-          {/* Type filter */}
-          <div className="flex gap-2 flex-wrap">
-            {(['all', 'social_event', 'competition', 'seminar', 'fun'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setFilter(t)}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-medium transition',
-                  filter === t
-                    ? 'bg-violet-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700',
-                )}
-              >
-                {t === 'all' ? 'All' : t.replace('_', ' ')}
-              </button>
-            ))}
-          </div>
+            <div className="subtle-scrollbar flex gap-2 overflow-x-auto pb-0.5">
+              {(['all', 'social_event', 'competition', 'seminar', 'fun'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setFilter(t)}
+                  className={cn(
+                    'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition active:scale-95',
+                    filter === t
+                      ? 'bg-violet-600 text-white shadow-[0_8px_18px_rgba(124,58,237,0.3)]'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700',
+                  )}
+                >
+                  {t === 'all' ? 'All' : t.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
+          </motion.div>
 
           {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <div key={i} className="h-40 rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-44 animate-pulse rounded-3xl border border-slate-200/70 bg-[linear-gradient(110deg,rgba(226,232,240,0.6),rgba(241,245,249,0.9),rgba(226,232,240,0.6))] dark:border-slate-700 dark:bg-[linear-gradient(110deg,rgba(30,41,59,0.75),rgba(51,65,85,0.9),rgba(30,41,59,0.75))]" />
               ))}
             </div>
           ) : (
@@ -353,25 +414,43 @@ export default function EntertainPage() {
                   <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
                     Upcoming &middot; {filteredUpcoming.length}
                   </p>
-                  {filteredUpcoming.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      joined={rsvpSet?.has(event.id) ?? false}
-                      showRsvp={!!user}
-                      onToggleRsvp={(joined) => toggleRsvp({ eventId: event.id, joined })}
-                      onShare={handleShare}
-                    />
-                  ))}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {filteredUpcoming.map((event, i) => (
+                      <motion.div
+                        key={event.id}
+                        initial={{ opacity: 0, y: 12, scale: 0.985 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.24, delay: 0.02 * i, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        <EventCard
+                          event={event}
+                          joined={rsvpSet?.has(event.id) ?? false}
+                          showRsvp={!!user}
+                          onToggleRsvp={(joined) => toggleRsvp({ eventId: event.id, joined })}
+                          onShare={handleShare}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
               )}
 
               {filteredUpcoming.length === 0 && (
-                <EmptyState
-                  icon={<Tv2 size={22} />}
-                  title={search ? 'No events found' : 'No upcoming events'}
-                  description={search ? `No results for "${search}"` : 'Check back soon for new events!'}
-                />
+                <div className="rounded-3xl border border-slate-200/80 bg-white/90 p-5 text-center shadow-sm dark:border-slate-700 dark:bg-slate-800/80">
+                  <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-300">
+                    <Tv2 size={24} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">{search ? 'No events found' : 'No upcoming events yet'}</h3>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {search ? `No results for "${search}"` : 'Watch this space. New drops are typically announced weekly.'}
+                  </p>
+                  <button
+                    onClick={() => toast.success('Notification preference saved')}
+                    className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(124,58,237,0.35)] transition hover:bg-violet-500 active:scale-95"
+                  >
+                    <BellRing size={15} /> Notify me
+                  </button>
+                </div>
               )}
 
               {/* Past events (collapsible) */}
@@ -379,22 +458,32 @@ export default function EntertainPage() {
                 <div className="space-y-3">
                   <button
                     onClick={() => setShowPast((v) => !v)}
-                    className="flex items-center justify-between w-full text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide hover:text-slate-600 dark:hover:text-slate-300 transition"
+                    className="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-400 transition hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
                   >
                     <span>Past events &middot; {filteredPast.length}</span>
                     <span className="normal-case font-normal">{showPast ? '▲ Hide' : '▼ Show'}</span>
                   </button>
-                  {showPast && filteredPast.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      joined={rsvpSet?.has(event.id) ?? false}
-                      past
-                      showRsvp={false}
-                      onToggleRsvp={() => {}}
-                      onShare={handleShare}
-                    />
-                  ))}
+                  {showPast && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {filteredPast.map((event, i) => (
+                        <motion.div
+                          key={event.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.22, delay: 0.015 * i, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                          <EventCard
+                            event={event}
+                            joined={rsvpSet?.has(event.id) ?? false}
+                            past
+                            showRsvp={false}
+                            onToggleRsvp={() => {}}
+                            onShare={handleShare}
+                          />
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -406,29 +495,46 @@ export default function EntertainPage() {
       {tab === 'gallery' && (
         <>
           {!galleryUrls || galleryUrls.length === 0 ? (
-            <EmptyState
-              icon={<ImageIcon size={22} />}
-              title="Gallery is empty"
-              description="Media will appear here once uploaded by admins."
-            />
+            <div className="space-y-3">
+              <div className="rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800/80">
+                <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300">
+                  <ImageIcon size={22} />
+                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Gallery is warming up</h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Upload highlights and this section will evolve into a visual discovery wall.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6].map((slot) => (
+                  <div key={slot} className="aspect-square rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+                    <div className="flex h-full flex-col items-center justify-center gap-1 rounded-xl bg-white/75 text-slate-400 dark:bg-slate-900/60 dark:text-slate-500">
+                      <Film size={16} />
+                      <span className="text-[11px] font-medium">Coming soon</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
             <>
               <p className="text-xs text-slate-400">
                 {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''} &middot; tap to view
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {galleryUrls.map((url, i) => (
-                  <button
+                  <motion.button
                     key={i}
                     onClick={() => setLightboxIdx(i)}
-                    className="aspect-square rounded-xl overflow-hidden focus-visible:ring-2 focus-visible:ring-violet-500"
+                    className="group aspect-square overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100 focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-slate-700 dark:bg-slate-800"
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.2, delay: 0.015 * i, ease: [0.22, 1, 0.36, 1] }}
                   >
                     <img
                       src={url}
                       alt=""
-                      className="w-full h-full object-cover hover:scale-105 transition duration-300"
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     />
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </>

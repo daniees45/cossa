@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutGrid, Vote, MessageSquare, Megaphone, Trophy, UserPlus } from 'lucide-react'
+import { LayoutGrid, Vote, MessageSquare, Megaphone, Trophy, UserPlus, Tv2 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
 const NAV = [
@@ -10,6 +10,7 @@ const NAV = [
   { label: 'Vote',    href: '/vote',    icon: Vote },
   { label: 'Chat',    href: '/chat',    icon: MessageSquare },
   { label: 'Info',    href: '/info',    icon: Megaphone },
+  { label: 'Entertainment', href: '/entertain', icon: Tv2 },
   { label: 'Compete', href: '/compete', icon: Trophy },
 ]
 

@@ -55,6 +55,27 @@
   }
 }
 
+@keyframes navProgressShimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+@keyframes navProgressGlow {
+  0%,
+  100% {
+    transform: translateX(40%) translateY(-50%) scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: translateX(40%) translateY(-50%) scale(1.18);
+    opacity: 0.55;
+  }
+}
+
 .shimmer-block {
   position: relative;
   overflow: hidden;
@@ -77,6 +98,18 @@
 
 .dark .shimmer-block::after {
   background: linear-gradient(90deg, transparent, rgba(226, 232, 240, 0.14), transparent);
+}
+
+.nav-progress-shimmer {
+  background-image: linear-gradient(90deg, #8b5cf6, #a78bfa 45%, #8b5cf6 80%);
+  background-size: 180% 100%;
+  animation: navProgressShimmer 1.15s linear infinite;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.55), 0 0 18px rgba(139, 92, 246, 0.35);
+}
+
+.nav-progress-glow {
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.95), 0 0 18px rgba(139, 92, 246, 0.8);
+  animation: navProgressGlow 1.25s ease-in-out infinite;
 }
 
 body {

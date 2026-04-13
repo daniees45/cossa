@@ -19,10 +19,10 @@ export function NavigationProgress() {
     clearTimers()
     active.current = true
     setOpacity(1)
-    setWidth(8)
-    let w = 8
+    setWidth(12)
+    let w = 12
     interval.current = setInterval(() => {
-      w += (92 - w) * 0.12
+      w += (94 - w) * 0.12
       setWidth(w)
     }, 180)
   }
@@ -71,13 +71,17 @@ export function NavigationProgress() {
   return (
     <div
       aria-hidden
-      className="fixed top-0 left-0 z-[9999] h-[3px] bg-violet-500 pointer-events-none"
+      className="pointer-events-none fixed left-0 top-0 z-[9999] h-1 overflow-visible"
       style={{
         width: `${width}%`,
         opacity,
-        boxShadow: opacity > 0 ? '0 0 10px rgba(139,92,246,0.7)' : 'none',
-        transition: 'width 180ms ease-out, opacity 300ms ease',
+        transition: 'width 200ms ease-out, opacity 300ms ease',
       }}
-    />
+    >
+      <div className="nav-progress-shimmer h-full w-full rounded-r-full bg-violet-500" />
+      {opacity > 0 && (
+        <span className="nav-progress-glow pointer-events-none absolute right-0 top-1/2 h-2.5 w-2.5 -translate-y-1/2 translate-x-[40%] rounded-full bg-violet-400" />
+      )}
+    </div>
   )
 }
