@@ -16,6 +16,7 @@ export function useSiteBranding() {
   useEffect(() => {
     const supabase = createClient()
     let cancelled = false
+    const channelName = 'site-branding-global'
 
     const load = async () => {
       try {
@@ -32,8 +33,16 @@ export function useSiteBranding() {
 
     void load()
 
+    // In Strict Mode or fast remounts, a channel with the same topic may still be alive.
+    // Remove stale branding channels first so we always attach callbacks before subscribe.
+    for (const existing of supabase.getChannels()) {
+      if (existing.topic === `realtime:${channelName}`) {
+        void supabase.removeChannel(existing)
+      }
+    }
+
     const channel = supabase
-      .channel(`site-branding-${Date.now()}`)
+      .channel(channelName)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'site_branding', filter: 'id=eq.1' }, (payload) => {
         setBranding(brandingFromRow(payload.new as {
           site_title: string
