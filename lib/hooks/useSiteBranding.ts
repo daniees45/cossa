@@ -43,6 +43,15 @@ export function useSiteBranding() {
 
     const channel = supabase
       .channel(channelName)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'site_branding', filter: 'id=eq.1' }, (payload) => {
+        setBranding(brandingFromRow(payload.new as {
+          site_title: string
+          site_subtitle: string
+          logo_url: string
+          light_background: string
+          dark_background: string
+        }))
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'site_branding', filter: 'id=eq.1' }, (payload) => {
         setBranding(brandingFromRow(payload.new as {
           site_title: string
@@ -62,12 +71,24 @@ export function useSiteBranding() {
 
   async function updateBranding(next: SiteBranding, updatedBy?: string) {
     const supabase = createClient()
+    const previous = branding
     const { error } = await supabase
       .from('site_branding')
       .update({ ...brandingToRow(next), updated_by: updatedBy ?? null })
       .eq('id', 1)
 
     if (error) throw error
+
+    void supabase.rpc('log_admin_action', {
+      p_action: 'site_branding_updated',
+      p_target_type: 'site_branding',
+      p_target_id: null,
+      p_details: {
+        before: brandingToRow(previous),
+        after: brandingToRow(next),
+      },
+    })
+
     setBranding(next)
   }
 

@@ -379,7 +379,7 @@ export function Topbar() {
   }
 
   return (
-    <header className="relative sticky top-0 z-40 flex h-14 min-w-0 items-center gap-1.5 border-b border-slate-200/90 bg-white/90 px-2 shadow-[0_2px_10px_rgba(15,23,42,0.04)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/88 min-[370px]:gap-2 min-[370px]:px-3 sm:gap-3 sm:px-4 md:px-6">
+    <header className="relative sticky top-0 z-40 flex h-14 min-w-0 items-center gap-1.5 border-b border-slate-200/70 bg-[var(--site-bg,#f8fafc)]/88 px-2 shadow-[0_2px_10px_rgba(15,23,42,0.04)] backdrop-blur dark:border-slate-700/70 dark:bg-[var(--site-bg-dark,#020617)]/84 min-[370px]:gap-2 min-[370px]:px-3 sm:gap-3 sm:px-4 md:px-6">
       {/* COSSA logo - mobile only */}
       <div className="mr-0.5 flex min-w-0 items-center gap-1.5 md:hidden sm:mr-1 sm:gap-2">
         <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center overflow-hidden">

@@ -1,17 +1,23 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Palette, RotateCcw, Save } from 'lucide-react'
+import { Palette, RotateCcw, Save, UploadCloud } from 'lucide-react'
 import { DEFAULT_SITE_BRANDING, type SiteBranding } from '@/lib/siteBranding'
 import { useSiteBranding } from '@/lib/hooks/useSiteBranding'
 import { toast } from 'sonner'
 import { useUser } from '@/lib/hooks/useUser'
+import { uploadFile } from '@/lib/utils/uploadFile'
+
+const MAX_LOGO_SIZE_BYTES = 3 * 1024 * 1024
+const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
 
 export default function AdminAppearancePage() {
   const { user } = useUser()
   const { branding, loading, updateBranding } = useSiteBranding()
   const [draft, setDraft] = useState<SiteBranding>(branding)
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   useEffect(() => {
     setDraft(branding)
@@ -34,6 +40,42 @@ export default function AdminAppearancePage() {
 
   function resetDefaults() {
     setDraft(DEFAULT_SITE_BRANDING)
+  }
+
+  async function onLogoFileSelected(file: File | null) {
+    if (!file || uploadingLogo) return
+
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      toast.error('Unsupported file type. Use PNG, JPG, WEBP, or SVG.')
+      return
+    }
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      toast.error('Logo file is too large. Maximum size is 3MB.')
+      return
+    }
+
+    setUploadingLogo(true)
+    setUploadProgress(8)
+    let progressTimer: ReturnType<typeof setInterval> | null = null
+    try {
+      progressTimer = setInterval(() => {
+        setUploadProgress((current) => (current >= 88 ? current : current + 7))
+      }, 140)
+
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png'
+      const path = `site-branding/logo-${Date.now()}.${ext}`
+      const publicUrl = await uploadFile(file, 'covers', path)
+      setUploadProgress(100)
+      setDraft((prev) => ({ ...prev, logoUrl: publicUrl }))
+      toast.success('Logo uploaded. Save changes to publish globally.')
+    } catch {
+      toast.error('Logo upload failed')
+    } finally {
+      if (progressTimer) clearInterval(progressTimer)
+      setUploadingLogo(false)
+      window.setTimeout(() => setUploadProgress(0), 450)
+    }
   }
 
   return (
@@ -71,12 +113,42 @@ export default function AdminAppearancePage() {
           </Field>
 
           <Field label="Logo image URL">
-            <input
-              value={draft.logoUrl}
-              onChange={(event) => setDraft((prev) => ({ ...prev, logoUrl: event.target.value }))}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-700 dark:bg-slate-800"
-              placeholder="https://..."
-            />
+            <div className="space-y-2">
+              <input
+                value={draft.logoUrl}
+                onChange={(event) => setDraft((prev) => ({ ...prev, logoUrl: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500 dark:border-slate-700 dark:bg-slate-800"
+                placeholder="https://..."
+              />
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                <UploadCloud size={14} />
+                {uploadingLogo ? 'Uploading logo...' : 'Upload logo file'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null
+                    void onLogoFileSelected(file)
+                    event.currentTarget.value = ''
+                  }}
+                />
+              </label>
+
+              {(uploadingLogo || uploadProgress > 0) && (
+                <div className="space-y-1">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div
+                      className="h-full rounded-full bg-cyan-500 transition-[width] duration-150"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Upload progress: {uploadProgress}%</p>
+                </div>
+              )}
+
+              <p className="text-[11px] text-slate-400">Accepted: PNG, JPG, WEBP, SVG. Max file size: 3MB.</p>
+            </div>
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">

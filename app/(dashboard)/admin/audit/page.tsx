@@ -1,6 +1,6 @@
 'use client'
-import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/components/shared/Avatar'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -18,6 +18,7 @@ type AuditLogRow = {
 }
 
 export default function AdminAuditPage() {
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
   const [actorFilter, setActorFilter] = useState('all')
@@ -36,6 +37,20 @@ export default function AdminAuditPage() {
       return (data ?? []) as unknown as AuditLogRow[]
     },
   })
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`admin-audit-live-${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_audit_logs' }, () => {
+        void queryClient.invalidateQueries({ queryKey: ['admin-audit-logs'] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
 
   const actions = useMemo(() => ['all', ...Array.from(new Set(logs.map((l) => l.action)))], [logs])
   const actors = useMemo(
