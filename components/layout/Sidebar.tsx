@@ -17,7 +17,6 @@ import { useRouter } from 'next/navigation'
 import { useUser } from '@/lib/hooks/useUser'
 import { cn } from '@/lib/utils/cn'
 import { getInitials } from '@/lib/utils/uploadFile'
-import { useEffect } from 'react'
 import { useChatStore } from '@/lib/stores/chatStore'
 
 const NAV = [
@@ -33,17 +32,10 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useUser()
-  const { dmUnread, clearDmUnread, channelUnread } = useChatStore()
+  const { dmUnread, channelUnread } = useChatStore()
   const totalDmUnread = Object.values(dmUnread).reduce((a, b) => a + b, 0)
   const totalChannelUnread = Object.values(channelUnread).reduce((a, b) => a + b, 0)
   const totalUnread = totalDmUnread + totalChannelUnread
-
-  // Clear DM unread badge when user navigates into chat
-  useEffect(() => {
-    if (pathname.startsWith('/chat')) {
-      clearDmUnread()
-    }
-  }, [pathname, clearDmUnread])
 
   async function handleLogout() {
     const supabase = createClient()

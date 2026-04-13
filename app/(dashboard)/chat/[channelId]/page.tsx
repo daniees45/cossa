@@ -144,7 +144,6 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
   const formRef = useRef<HTMLFormElement>(null)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
   const senderProfileCacheRef = useRef<Record<string, Profile>>({})
-  const senderFetchPromisesRef = useRef<Record<string, Promise<Profile | null>>>({})
 
   const { data: channel } = useQuery({
     queryKey: ['channel', channelId],
@@ -246,39 +245,42 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
     senderProfileCacheRef.current[profile.id] = profile
   }
 
-  async function getSenderProfile(senderId: string): Promise<Profile | null> {
+  function fallbackSenderProfile(senderId: string): Profile | null {
     const cached = senderProfileCacheRef.current[senderId]
     if (cached) return cached
-
-    const pending = senderFetchPromisesRef.current[senderId]
-    if (pending) return pending
-
-    const supabase = createClient()
-    const req: Promise<Profile | null> = (async () => {
-      try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', senderId)
-          .single()
-        const profile = (data as Profile | null) ?? null
-        if (profile) senderProfileCacheRef.current[senderId] = profile
-        return profile
-      } finally {
-        delete senderFetchPromisesRef.current[senderId]
+    if (senderId === user?.id && user) return user as Profile
+    const member = members.find((m) => m.id === senderId)
+    if (member) {
+      return {
+        id: member.id,
+        username: member.username,
+        full_name: member.full_name,
+        avatar_url: member.avatar_url,
+        banner_url: null,
+        avatar_frame: 'none',
+        bio: null,
+        level: null,
+        department: null,
+        role: 'student',
+        index_number: null,
+        public_key: null,
+        signing_public_key: null,
+        encrypted_private_key: null,
+        is_banned: false,
+        ban_reason: null,
+        created_at: new Date().toISOString(),
       }
-    })()
-
-    senderFetchPromisesRef.current[senderId] = req
-    return req
+    }
+    return null
   }
 
-  async function hydrateMessageSenderRow(
+  function messageFromRealtimeRow(
     row: Database['public']['Tables']['messages']['Row'],
-  ): Promise<MessageWithSender | null> {
-    const sender = await getSenderProfile(row.sender_id)
+  ): MessageWithSender | null {
+    const sender = fallbackSenderProfile(row.sender_id)
     if (!sender) return null
-    return { ...row, sender } as MessageWithSender
+    cacheSenderProfile(sender)
+    return { ...row, sender }
   }
 
   // Mark channel as read on mount
@@ -343,35 +345,30 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
       .on('broadcast', { event: 'new_message' }, (payload) => {
         const msg = payload.payload as Partial<MessageWithSender> & { id?: string; sender_id?: string }
         if (!msg?.id || !msg.sender_id) return
-
-        const withSender = async () => {
-          let hydrated: MessageWithSender | null = null
-          if (msg.sender) {
-            cacheSenderProfile(msg.sender as Profile)
-            hydrated = msg as MessageWithSender
-          } else {
-            hydrated = await hydrateMessageSenderRow(msg as Database['public']['Tables']['messages']['Row'])
-          }
-          if (!hydrated) return
-
-          setMessages((prev) =>
-            prev.find((m) => m.id === hydrated!.id) ? prev : [...prev, hydrated!]
-          )
-          if (hydrated.sender_id !== user?.id) {
-            markChannelSeen()
-          }
-          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        let hydrated: MessageWithSender | null = null
+        if (msg.sender) {
+          cacheSenderProfile(msg.sender as Profile)
+          hydrated = msg as MessageWithSender
+        } else {
+          hydrated = messageFromRealtimeRow(msg as Database['public']['Tables']['messages']['Row'])
         }
+        if (!hydrated) return
 
-        void withSender()
+        setMessages((prev) =>
+          prev.find((m) => m.id === hydrated!.id) ? prev : [...prev, hydrated!]
+        )
+        if (hydrated.sender_id !== user?.id) {
+          markChannelSeen()
+        }
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
       })
       // ── postgres_changes: fallback for multi-device / future-proofing ───────
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${channelId}` },
-        async (payload) => {
+        (payload) => {
           const row = payload.new as Database['public']['Tables']['messages']['Row']
-          const msg = await hydrateMessageSenderRow(row)
+          const msg = messageFromRealtimeRow(row)
           if (!msg) return
 
           setMessages((prev) =>
@@ -1496,73 +1493,77 @@ export default function ChannelPage({ params }: { params: Promise<{ channelId: s
         )}
       </AnimatePresence>
 
-      {/* File preview */}
-      {(mediaPreview || mediaFile) && (
-        <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
-          {mediaPreview ? (
-            <div className="relative inline-block">
-              <img src={mediaPreview} alt="" className="h-16 rounded-lg object-cover" />
-              <button
-                onClick={() => { setMediaFile(null); setMediaPreview(null) }}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
-              >
-                <X size={10} className="text-white" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Paperclip size={14} className="text-slate-400 shrink-0" />
-              <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{mediaFile!.name}</span>
-              <button onClick={() => setMediaFile(null)} className="ml-auto text-red-400 hover:text-red-500 shrink-0">
-                <X size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Input */}
-      <form
-        ref={formRef}
-        onSubmit={sendMessage}
-        className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-1 md:py-2 border-t dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur"
-        style={{ borderColor: panelBorder, backgroundColor: hexToRgba(themeColor, 0.05) }}
+      <div
+        className="sticky bottom-0 z-20 border-t dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur"
+        style={{ borderColor: panelBorder, backgroundColor: hexToRgba(themeColor, 0.08) }}
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*,.pdf,.doc,.docx"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0 mb-0.5"
-          title="Attach file"
+        {/* File preview */}
+        {(mediaPreview || mediaFile) && (
+          <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+            {mediaPreview ? (
+              <div className="relative inline-block">
+                <img src={mediaPreview} alt="" className="h-16 rounded-lg object-cover" />
+                <button
+                  onClick={() => { setMediaFile(null); setMediaPreview(null) }}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+                >
+                  <X size={10} className="text-white" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Paperclip size={14} className="text-slate-400 shrink-0" />
+                <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{mediaFile!.name}</span>
+                <button onClick={() => setMediaFile(null)} className="ml-auto text-red-400 hover:text-red-500 shrink-0">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Input */}
+        <form
+          ref={formRef}
+          onSubmit={sendMessage}
+          className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-1 md:py-2 bg-transparent shrink-0"
         >
-          <Paperclip size={18} />
-        </button>
-        <textarea
-          value={text}
-          onChange={handleInputChange}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); formRef.current?.requestSubmit() }
-          }}
-          rows={1}
-          placeholder="Type a message…"
-          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-base text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none resize-none max-h-32 overflow-y-auto"
-          style={{ ...inputTextStyle, boxShadow: `0 0 0 0 ${accentSoft}` }}
-        />
-        <button
-          type="submit"
-          disabled={(!text.trim() && !mediaFile) || sending || uploading}
-          className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
-          style={{ backgroundColor: themeColor }}
-        >
-          {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
-        </button>
-      </form>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,.pdf,.doc,.docx"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0 mb-0.5"
+            title="Attach file"
+          >
+            <Paperclip size={18} />
+          </button>
+          <textarea
+            value={text}
+            onChange={handleInputChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); formRef.current?.requestSubmit() }
+            }}
+            rows={1}
+            placeholder="Type a message…"
+            className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-base text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none resize-none max-h-32 overflow-y-auto"
+            style={{ ...inputTextStyle, boxShadow: `0 0 0 0 ${accentSoft}` }}
+          />
+          <button
+            type="submit"
+            disabled={(!text.trim() && !mediaFile) || sending || uploading}
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
+            style={{ backgroundColor: themeColor }}
+          >
+            {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useRef, useState, useCallback, use } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/lib/hooks/useUser'
 import { Avatar } from '@/components/shared/Avatar'
@@ -58,8 +58,7 @@ function formatTime(iso: string) {
 export default function DMPage({ params }: { params: Promise<{ userId: string }> }) {
   const { userId } = use(params)
   const { user } = useUser()
-  const qc = useQueryClient()
-  const { clearDmUnread } = useChatStore()
+  const { clearDmUnread, syncDmReadHighWatermark } = useChatStore()
   const { confirm } = useDialog()
 
   const [showSettings, setShowSettings] = useState(false)
@@ -120,7 +119,6 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const senderProfileCacheRef = useRef<Record<string, Profile>>({})
-  const senderFetchPromisesRef = useRef<Record<string, Promise<Profile | null>>>({})
 
   const { data: other } = useQuery({
     queryKey: ['profile', userId],
@@ -202,39 +200,40 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
     return () => { cancelled = true }
   }, [user, other])
 
-  async function getSenderProfile(senderId: string): Promise<Profile | null> {
-    const cached = senderProfileCacheRef.current[senderId]
-    if (cached) return cached
-
-    const pending = senderFetchPromisesRef.current[senderId]
-    if (pending) return pending
-
-    const supabase = createClient()
-    const req: Promise<Profile | null> = (async () => {
-      try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', senderId)
-          .single()
-        const profile = (data as Profile | null) ?? null
-        if (profile) senderProfileCacheRef.current[senderId] = profile
-        return profile
-      } finally {
-        delete senderFetchPromisesRef.current[senderId]
-      }
-    })()
-
-    senderFetchPromisesRef.current[senderId] = req
-    return req
+  function senderFromCache(senderId: string): Profile | null {
+    if (senderProfileCacheRef.current[senderId]) return senderProfileCacheRef.current[senderId]
+    if (senderId === user?.id && user) return user as Profile
+    if (senderId === other?.id && other) return other
+    return null
   }
 
-  async function hydrateMessageSenderRow(
-    row: { id: string; sender_id: string; receiver_id: string | null; content: string; media_url: string | null; read_at: string | null; edited_at: string | null; created_at: string; channel_id: string | null; deleted_for_sender: boolean },
-  ): Promise<MessageWithSender | null> {
-    const sender = await getSenderProfile(row.sender_id)
+  function toMessageWithSender(row: {
+    id: string
+    sender_id: string
+    receiver_id: string | null
+    channel_id: string | null
+    content: string
+    media_url: string | null
+    read_at: string | null
+    edited_at: string | null
+    created_at: string
+    deleted_for_sender: boolean
+  }): MessageWithSender | null {
+    const sender = senderFromCache(row.sender_id)
     if (!sender) return null
-    return { ...row, sender } as MessageWithSender
+    senderProfileCacheRef.current[sender.id] = sender
+    return { ...row, sender }
+  }
+
+  async function markConversationSeen(readAt?: string) {
+    if (!user) return
+    const stamp = readAt ?? new Date().toISOString()
+    clearDmUnread(userId)
+    await syncDmReadHighWatermark({
+      currentUserId: user.id,
+      peerUserId: userId,
+      readAt: stamp,
+    })
   }
 
   // ── Decrypt whenever messages change ────────────────────────────────────
@@ -336,17 +335,8 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         setTimeout(() => bottomRef.current?.scrollIntoView(), 50)
       })
 
-    // Mark incoming messages as read
-    supabase
-      .from('messages')
-      .update({ read_at: new Date().toISOString() })
-      .eq('sender_id', userId)
-      .eq('receiver_id', user.id)
-      .is('read_at', null)
-      .then(() => {
-        clearDmUnread(userId)
-        qc.invalidateQueries({ queryKey: ['dm-unread'] })
-      })
+    // Mark incoming messages as read with one high-watermark write.
+    void markConversationSeen()
 
     // Realtime subscriptions
     // We subscribe to both directions of the conversation so BOTH sender and
@@ -371,7 +361,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         (row.sender_id === userId && row.receiver_id === user.id)
       if (!inConversation) return
 
-      const msg = await hydrateMessageSenderRow(row)
+      const msg = toMessageWithSender(row)
       if (!msg) return
 
       setMessages((prev) =>
@@ -383,7 +373,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
 
       // If we are the receiver, mark as read immediately
       if (row.receiver_id === user.id) {
-        await supabase.from('messages').update({ read_at: new Date().toISOString() }).eq('id', row.id)
+        await markConversationSeen(row.created_at)
       }
     }
 
@@ -402,8 +392,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
         // Mark as read if we are the receiver
         if (row.receiver_id === user?.id) {
-          const sb = createClient()
-          await sb.from('messages').update({ read_at: new Date().toISOString() }).eq('id', row.id)
+          await markConversationSeen(row.created_at)
         }
       })
       // ── postgres_changes: fallback for multi-device / missed broadcasts ────
@@ -484,7 +473,7 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
       supabase.removeChannel(typingCh)
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
     }
-  }, [user, userId, loadReactions, clearDmUnread, qc])
+  }, [user, userId, loadReactions, clearDmUnread, syncDmReadHighWatermark, other])
 
   // Scroll-to-bottom button
   useEffect(() => {
@@ -1298,71 +1287,73 @@ export default function DMPage({ params }: { params: Promise<{ userId: string }>
         )}
       </AnimatePresence>
 
-      {/* File preview */}
-      {(mediaPreview || mediaFile) && (
-        <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
-          {mediaPreview ? (
-            <div className="relative inline-block">
-              <img src={mediaPreview} alt="" className="h-16 rounded-lg object-cover" />
-              <button
-                onClick={() => { setMediaFile(null); setMediaPreview(null) }}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
-              >
-                <X size={10} className="text-white" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Paperclip size={14} className="text-slate-400 shrink-0" />
-              <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{mediaFile!.name}</span>
-              <button onClick={() => setMediaFile(null)} className="ml-auto text-red-400 hover:text-red-500 shrink-0">
-                <X size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="sticky bottom-0 z-20 border-t border-slate-200/70 bg-white/95 dark:border-slate-800 dark:bg-slate-900/95 backdrop-blur">
+        {/* File preview */}
+        {(mediaPreview || mediaFile) && (
+          <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+            {mediaPreview ? (
+              <div className="relative inline-block">
+                <img src={mediaPreview} alt="" className="h-16 rounded-lg object-cover" />
+                <button
+                  onClick={() => { setMediaFile(null); setMediaPreview(null) }}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+                >
+                  <X size={10} className="text-white" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Paperclip size={14} className="text-slate-400 shrink-0" />
+                <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{mediaFile!.name}</span>
+                <button onClick={() => setMediaFile(null)} className="ml-auto text-red-400 hover:text-red-500 shrink-0">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Input */}
-      <form
-        ref={formRef}
-        onSubmit={sendMessage}
-        className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-1 md:py-2 border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shrink-0 backdrop-blur"
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*,video/*,.pdf,.doc,.docx"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0 mb-0.5"
-          title="Attach file"
+        {/* Input */}
+        <form
+          ref={formRef}
+          onSubmit={sendMessage}
+          className="flex items-end gap-2 px-2.5 sm:px-4 lg:px-6 py-1 md:py-2 bg-transparent shrink-0"
         >
-          <Paperclip size={18} />
-        </button>
-        <textarea
-          value={text}
-          onChange={handleInputChange}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); formRef.current?.requestSubmit() }
-          }}
-          rows={1}
-          placeholder={e2eActive ? `Message ${other?.full_name ?? ''} (encrypted)…` : `Message ${other?.full_name ?? ''}…`}
-          className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-base text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500 resize-none max-h-32 overflow-y-auto"
-          style={inputTextStyle}
-        />
-        <button
-          type="submit"
-          disabled={(!text.trim() && !mediaFile) || uploading || sending}
-          className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
-        >
-          {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
-        </button>
-      </form>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,.pdf,.doc,.docx"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 text-slate-400 hover:text-violet-500 transition shrink-0 mb-0.5"
+            title="Attach file"
+          >
+            <Paperclip size={18} />
+          </button>
+          <textarea
+            value={text}
+            onChange={handleInputChange}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); formRef.current?.requestSubmit() }
+            }}
+            rows={1}
+            placeholder={e2eActive ? `Message ${other?.full_name ?? ''} (encrypted)…` : `Message ${other?.full_name ?? ''}…`}
+            className="flex-1 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 text-base text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:ring-2 focus:ring-violet-500 resize-none max-h-32 overflow-y-auto"
+            style={inputTextStyle}
+          />
+          <button
+            type="submit"
+            disabled={(!text.trim() && !mediaFile) || uploading || sending}
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 flex items-center justify-center transition shrink-0 mb-0.5"
+          >
+            {(sending || uploading) ? <Spinner size="sm" className="border-white/30 border-t-white" /> : <Send size={16} className="text-white" />}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

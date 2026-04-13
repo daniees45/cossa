@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/client'
 import { useNotificationStore } from '@/lib/stores/notificationStore'
 import { useUser } from './useUser'
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
-import { useChatStore } from '@/lib/stores/chatStore'
 import type { PostWithAuthor } from '@/types/app'
 
 const VISIBLE_NOTIFICATION_TYPES = new Set([
@@ -20,7 +19,6 @@ const VISIBLE_NOTIFICATION_TYPES = new Set([
 export function useRealtime() {
   const { user } = useUser()
   const { addNotification } = useNotificationStore()
-  const { incDmUnread, incChannelUnread } = useChatStore()
   const qc = useQueryClient()
 
   useEffect(() => {
@@ -96,36 +94,10 @@ export function useRealtime() {
           )
         }
       )
-      // ── DM unread: increment per-sender when a DM arrives ───────────────────
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const senderId = (payload.new as { sender_id: string }).sender_id
-          incDmUnread(senderId)
-          qc.invalidateQueries({ queryKey: ['dm-unread'] })
-        }
-      )
-      // ── Channel unread: mark channel dirty on new message ───────────────────
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-          const msg = payload.new as { channel_id: string | null; sender_id: string }
-          if (msg.channel_id && msg.sender_id !== user.id) {
-            incChannelUnread(msg.channel_id)
-          }
-        }
-      )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, addNotification, incDmUnread, incChannelUnread, qc])
+  }, [user, addNotification, qc])
 }

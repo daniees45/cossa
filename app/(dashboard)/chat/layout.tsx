@@ -18,7 +18,7 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname()
   const router = useRouter()
   const qc = useQueryClient()
-  const { dmUnread, clearDmUnread, channelUnread, setChannelUnread, incChannelUnread } = useChatStore()
+  const { dmUnread, clearDmUnread, channelUnread, setChannelUnread } = useChatStore()
 
   // New DM search
   const [showDmSearch, setShowDmSearch] = useState(false)
@@ -40,13 +40,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     private_join_mode: 'approval' as 'approval' | 'code',
     private_entry_code: '',
   })
-  const pathnameRef = useRef(pathname)
-  const myChannelIdsRef = useRef<Set<string> | undefined>(undefined)
-
-  useEffect(() => {
-    pathnameRef.current = pathname
-  }, [pathname])
-
   const { data: myChannelIds } = useQuery({
     queryKey: ['my-channel-memberships', user?.id],
     enabled: !!user,
@@ -59,10 +52,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
       return new Set((data ?? []).map((r) => r.channel_id))
     },
   })
-
-  useEffect(() => {
-    myChannelIdsRef.current = myChannelIds
-  }, [myChannelIds])
 
   const { data: channels } = useQuery({
     queryKey: ['channels'],
@@ -101,84 +90,13 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
     },
   })
 
-  // Initial DM unread counts from DB (stale=Infinity, refreshed by invalidation)
-  const { data: dbUnread } = useQuery({
-    queryKey: ['dm-unread'],
-    enabled: !!user,
-    staleTime: Infinity,
-    queryFn: async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('messages')
-        .select('sender_id')
-        .eq('receiver_id', user!.id)
-        .is('read_at', null)
-      if (!data) return {} as Record<string, number>
-      const counts: Record<string, number> = {}
-      for (const m of data) {
-        counts[m.sender_id] = (counts[m.sender_id] ?? 0) + 1
-      }
-      return counts
-    },
-  })
-
-  const { data: dbChannelUnread } = useQuery({
-    queryKey: ['channel-unread'],
-    enabled: !!user,
-    staleTime: Infinity,
-    queryFn: async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase.rpc('get_channel_unread_counts')
-      if (error || !data) return {} as Record<string, number>
-      const counts: Record<string, number> = {}
-      for (const row of data as Array<{ channel_id: string; unread_count: number }>) {
-        counts[row.channel_id] = row.unread_count
-      }
-      return counts
-    },
-  })
-
   // Clear channel unread when visiting the channel page
   useEffect(() => {
     const match = pathname.match(/^\/chat\/([^/]+)$/)
     if (match && match[1] !== 'dm') {
       setChannelUnread(match[1], 0)
-      qc.setQueryData<Record<string, number>>(['channel-unread'], (prev) => {
-        if (!prev) return prev
-        return { ...prev, [match[1]]: 0 }
-      })
     }
-  }, [pathname, setChannelUnread, qc])
-
-  useEffect(() => {
-    if (!user || !myChannelIds) return
-    const supabase = createClient()
-    // Use a unique topic per mount so we never re-open an already subscribed channel instance.
-    const topic = `channel-unread-${user.id}-${Date.now()}`
-    const ch = supabase.channel(topic)
-
-    ch.on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'messages' },
-      (payload) => {
-        const row = payload.new as { channel_id: string | null; sender_id: string }
-        if (!row.channel_id) return
-        if (row.sender_id === user.id) return
-        if (!myChannelIdsRef.current?.has(row.channel_id)) return
-        if (pathnameRef.current === `/chat/${row.channel_id}`) {
-          setChannelUnread(row.channel_id, 0)
-          return
-        }
-        incChannelUnread(row.channel_id)
-      },
-    )
-
-    ch.subscribe()
-
-    return () => {
-      supabase.removeChannel(ch)
-    }
-  }, [user, myChannelIds, setChannelUnread, incChannelUnread])
+  }, [pathname, setChannelUnread])
 
   // DM user search
   useEffect(() => {
@@ -203,16 +121,15 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   }, [dmSearch, user])
 
   function totalUnreadFor(userId: string) {
-    return (dbUnread?.[userId] ?? 0) + (dmUnread[userId] ?? 0)
+    return dmUnread[userId] ?? 0
   }
 
   function totalChannelUnreadFor(channelId: string) {
-    return (dbChannelUnread?.[channelId] ?? 0) + (channelUnread[channelId] ?? 0)
+    return channelUnread[channelId] ?? 0
   }
 
   function navigateToDm(uid: string) {
     clearDmUnread(uid)
-    qc.invalidateQueries({ queryKey: ['dm-unread'] })
     router.push(`/chat/dm/${uid}`)
     setShowDmSearch(false)
     setDmSearch('')
