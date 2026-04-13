@@ -29,6 +29,41 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!user) return
+
+    let fired = false
+
+    const logoutOnClose = () => {
+      if (fired) return
+      fired = true
+
+      const url = '/api/auth/logout'
+      const payload = JSON.stringify({ reason: 'page_close' })
+
+      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+        const ok = navigator.sendBeacon(url, payload)
+        if (ok) return
+      }
+
+      void fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        keepalive: true,
+        headers: { 'content-type': 'application/json' },
+        body: payload,
+      })
+    }
+
+    window.addEventListener('pagehide', logoutOnClose)
+    window.addEventListener('beforeunload', logoutOnClose)
+
+    return () => {
+      window.removeEventListener('pagehide', logoutOnClose)
+      window.removeEventListener('beforeunload', logoutOnClose)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
     const supabase = createClient()
 
     let active = true

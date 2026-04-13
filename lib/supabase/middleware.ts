@@ -40,9 +40,34 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/reset-password')
 
+  if (user && !pathname.startsWith('/banned')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_banned')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profile?.is_banned) {
+      await supabase.auth.signOut()
+      const url = request.nextUrl.clone()
+      url.pathname = '/banned'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
+  }
+
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    const next = `${pathname}${request.nextUrl.search}`
+    url.searchParams.set('next', next)
+    return NextResponse.redirect(url)
+  }
+
+  if (user && pathname.startsWith('/banned')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

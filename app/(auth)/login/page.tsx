@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,6 +18,7 @@ type FormData = z.infer<typeof schema>
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showPass, setShowPass] = useState(false)
 
   const {
@@ -65,7 +66,12 @@ export default function LoginPage() {
       }
     }
 
-    router.push('/')
+    const nextParam = searchParams.get('next')
+    const nextPath = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+      ? nextParam
+      : '/'
+
+    router.push(nextPath)
     router.refresh()
   }
 
