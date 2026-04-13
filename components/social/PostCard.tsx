@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import Link from 'next/link'
-import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh, Flag } from 'lucide-react'
+import { Heart, MessageCircle, Share2, MoreHorizontal, Pin, Trash2, X, Reply, Bookmark, Trophy, Laugh, Flag, CalendarDays, ShieldCheck, ExternalLink, AtSign, Hash, ImagePlus, ChevronDown, ChevronRight, SendHorizontal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/shared/Avatar'
@@ -10,6 +10,7 @@ import { timeAgo } from '@/lib/utils/formatDate'
 import { cn } from '@/lib/utils/cn'
 import type { PostWithAuthor } from '@/types/app'
 import { useUser } from '@/lib/hooks/useUser'
+import { useSearchParams } from 'next/navigation'
 
 interface PostCardProps {
   post: PostWithAuthor
@@ -17,6 +18,11 @@ interface PostCardProps {
 }
 
 type ReportReason = 'spam' | 'inappropriate' | 'harassment' | 'misinformation' | 'other'
+
+function extractFirstUrl(content: string): string | null {
+  const match = content.match(/https?:\/\/[^\s<]+/i)
+  return match?.[0] ?? null
+}
 
 export function PostCard({ post, onDeleted }: PostCardProps) {
   const { user } = useUser()
@@ -35,6 +41,15 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [sharedPulse, setSharedPulse] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const firstUrl = extractFirstUrl(post.content)
+  const linkHost = (() => {
+    if (!firstUrl) return null
+    try {
+      return new URL(firstUrl).hostname.replace(/^www\./, '')
+    } catch {
+      return null
+    }
+  })()
 
   // Sync when React Query cache is updated by realtime (likes/comments from others)
   useEffect(() => { setLikes(post.likes_count) }, [post.likes_count])
@@ -105,10 +120,17 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
   }
 
   function handleShare() {
-    navigator.clipboard.writeText(`${window.location.origin}/social/${post.id}`)
+    const shareUrl = `${window.location.origin}/social/${post.id}`
+    if (navigator.share) {
+      void navigator.share({ title: `${post.author.full_name} on COSSA`, url: shareUrl }).catch(() => {
+        navigator.clipboard.writeText(shareUrl)
+      })
+    } else {
+      navigator.clipboard.writeText(shareUrl)
+    }
     setSharedPulse(true)
     setTimeout(() => setSharedPulse(false), 420)
-    toast.success('Link copied!')
+    toast.success('Post link ready to share')
   }
 
   async function submitReport() {
@@ -145,7 +167,9 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -12, scale: 0.97 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="overflow-hidden rounded-[1.7rem] border border-slate-200/80 bg-white/96 shadow-[0_14px_38px_rgba(15,23,42,0.06)] backdrop-blur dark:border-slate-700/70 dark:bg-slate-800/96"
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.995 }}
+          className="overflow-hidden rounded-[1.7rem] border border-slate-200/80 bg-white/96 shadow-[0_14px_38px_rgba(15,23,42,0.06)] backdrop-blur transition-shadow hover:shadow-[0_20px_44px_rgba(15,23,42,0.1)] dark:border-slate-700/70 dark:bg-slate-800/96"
         >
       {/* Pinned banner */}
       {post.pinned && (
@@ -167,6 +191,12 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
           <span className="text-emerald-600 dark:text-emerald-300 text-xs font-medium">Achievement</span>
         </div>
       )}
+      {post.type === 'event_post' && (
+        <div className="flex items-center gap-1.5 px-4 py-1.5 bg-cyan-50 dark:bg-cyan-900/20 border-b border-cyan-100 dark:border-cyan-800">
+          <CalendarDays size={12} className="text-cyan-600" />
+          <span className="text-cyan-700 dark:text-cyan-300 text-xs font-medium">Event</span>
+        </div>
+      )}
 
       <div className="p-4 sm:p-5">
         {/* Header */}
@@ -174,7 +204,14 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
           <Link href={`/profile/${post.author.username}`} className="flex min-w-0 flex-1 items-center gap-2.5">
             <Avatar src={post.author.avatar_url} name={post.author.full_name} size="sm" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold leading-none text-slate-900 dark:text-white">{post.author.full_name}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-sm font-semibold leading-none text-slate-900 dark:text-white">{post.author.full_name}</p>
+                {['admin', 'super_admin'].includes(post.author.role) && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                    <ShieldCheck size={10} /> Official
+                  </span>
+                )}
+              </div>
               <p className="mt-0.5 truncate text-xs text-slate-400">@{post.author.username} · {timeAgo(post.created_at)}</p>
             </div>
           </Link>
@@ -233,6 +270,21 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
           dangerouslySetInnerHTML={{ __html: post.content }}
         />
 
+        {firstUrl && linkHost && (
+          <a
+            href={firstUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-3 block rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 transition hover:border-cyan-300 hover:bg-cyan-50/60 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-cyan-700"
+          >
+            <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">Link preview</p>
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{linkHost}</p>
+              <ExternalLink size={14} className="text-slate-400" />
+            </div>
+          </a>
+        )}
+
         {/* Media */}
         {post.media_urls && post.media_urls.length > 0 && (
           <div className={cn(
@@ -240,11 +292,20 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             post.media_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
           )}>
             {post.media_urls.map((url, i) => {
+              const count = post.media_urls?.length ?? 0
+              const mediaClass = cn(
+                'w-full object-cover',
+                count === 1 && 'h-64 sm:h-80',
+                count === 2 && 'h-40 sm:h-48',
+                count === 3 && i === 0 && 'col-span-2 h-52 sm:h-64',
+                count === 3 && i > 0 && 'h-36 sm:h-44',
+                count >= 4 && 'h-36 sm:h-44',
+              )
               const isVideo = /\.(mp4|webm|mov|ogg)$/i.test(url)
               return isVideo ? (
-                <video key={i} src={url} controls className={cn('w-full object-cover', post.media_urls?.length === 1 ? 'h-64 sm:h-80' : 'h-40 sm:h-48')} />
+                <video key={i} src={url} controls className={mediaClass} />
               ) : (
-                <img key={i} src={url} alt="" className={cn('w-full object-cover', post.media_urls?.length === 1 ? 'h-64 sm:h-80' : 'h-40 sm:h-48')} />
+                <img key={i} src={url} alt="" className={mediaClass} />
               )
             })}
           </div>
@@ -286,6 +347,14 @@ export function PostCard({ post, onDeleted }: PostCardProps) {
             </motion.span>
             {commentsCount > 0 && <span>{commentsCount}</span>}
           </motion.button>
+
+          <Link
+            href={`/social/${post.id}`}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-violet-600 dark:hover:bg-slate-700/70"
+          >
+            <Reply size={16} />
+            <span>Thread</span>
+          </Link>
 
           <motion.button
             onClick={handleShare}
@@ -440,14 +509,48 @@ type CommentRow = {
 
 function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentAdded?: () => void }) {
   const { user } = useUser()
+  const searchParams = useSearchParams()
   const [comments, setComments] = useState<CommentRow[]>([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null)
+  const [typingUsers, setTypingUsers] = useState<string[]>([])
+  const [mobileInputFocused, setMobileInputFocused] = useState(false)
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
+  const mobileInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const desktopInputRef = useRef<HTMLTextAreaElement | null>(null)
+  const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const typingBroadcastAtRef = useRef(0)
+  const typingChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   // Track IDs submitted by current user to avoid double-counting via realtime
   const submittedRef = useRef(new Set<string>())
   const onCommentAddedRef = useRef(onCommentAdded)
+  const highlightedCommentId = searchParams.get('comment') || searchParams.get('commentId') || searchParams.get('c')
+
   useEffect(() => { onCommentAddedRef.current = onCommentAdded }, [onCommentAdded])
+
+  useEffect(() => {
+    const autosize = (el: HTMLTextAreaElement | null, maxHeight: number) => {
+      if (!el) return
+      el.style.height = '0px'
+      el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
+    }
+    autosize(mobileInputRef.current, 120)
+    autosize(desktopInputRef.current, 210)
+  }, [text, replyingTo])
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+
+    const baselineHeight = viewport.height
+    const onResize = () => {
+      setKeyboardOpen(viewport.height < baselineHeight - 120)
+    }
+
+    viewport.addEventListener('resize', onResize)
+    return () => viewport.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -466,7 +569,7 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
 
     // Live subscription — new comments from other users appear instantly
     const realtimeChannel = supabase
-      .channel(`comments-${postId}`)
+      .channel(`comments-${postId}-${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'post_comments', filter: `post_id=eq.${postId}` },
@@ -479,10 +582,69 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
           submittedRef.current.delete(newId)
         }
       )
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        const data = payload as { userId?: string; name?: string; active?: boolean }
+        if (!data?.userId || !data?.name || data.userId === user?.id) return
+
+        if (typingTimeoutsRef.current[data.userId]) {
+          clearTimeout(typingTimeoutsRef.current[data.userId])
+        }
+
+        if (data.active !== false) {
+          setTypingUsers((current) => (current.includes(data.name as string) ? current : [...current, data.name as string]))
+          typingTimeoutsRef.current[data.userId] = setTimeout(() => {
+            setTypingUsers((current) => current.filter((name) => name !== data.name))
+            delete typingTimeoutsRef.current[data.userId as string]
+          }, 2200)
+        } else {
+          setTypingUsers((current) => current.filter((name) => name !== data.name))
+          delete typingTimeoutsRef.current[data.userId]
+        }
+      })
       .subscribe()
 
-    return () => { supabase.removeChannel(realtimeChannel) }
-  }, [postId])
+    typingChannelRef.current = realtimeChannel
+
+    return () => {
+      Object.values(typingTimeoutsRef.current).forEach((timeout) => clearTimeout(timeout))
+      typingTimeoutsRef.current = {}
+      typingChannelRef.current = null
+      supabase.removeChannel(realtimeChannel)
+    }
+  }, [postId, user?.id])
+
+  function broadcastTyping(active: boolean) {
+    if (!user || !typingChannelRef.current) return
+    void typingChannelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: {
+        userId: user.id,
+        name: user.username,
+        active,
+      },
+    })
+  }
+
+  function handleTypingChange(nextText: string) {
+    setText(nextText)
+    const now = Date.now()
+    if (nextText.trim().length > 0 && now - typingBroadcastAtRef.current > 900) {
+      typingBroadcastAtRef.current = now
+      broadcastTyping(true)
+    }
+    if (nextText.trim().length === 0) {
+      broadcastTyping(false)
+    }
+  }
+
+  function focusComposer() {
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      mobileInputRef.current?.focus()
+      return
+    }
+    desktopInputRef.current?.focus()
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -503,29 +665,65 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
       submittedRef.current.add(newComment.id)
       setText('')
       setReplyingTo(null)
+      broadcastTyping(false)
       onCommentAdded?.()
     }
   }
 
   return (
-    <div className="border-t border-slate-100 bg-slate-50/55 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/45 sm:px-5 sm:py-5">
+    <div className={cn(
+      'border-t border-slate-100 bg-slate-50/55 px-4 py-4 dark:border-slate-700 dark:bg-slate-800/45 sm:px-5 sm:py-5',
+      user && 'pb-[calc(var(--mobile-nav-height)+6.4rem)] md:pb-5'
+    )}>
       <div className="mb-3 flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Conversation</p>
         <p className="text-xs text-slate-400">{comments.length} {comments.length === 1 ? 'comment' : 'comments'}</p>
       </div>
 
       {loading ? (
-        <p className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2 text-xs text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">Loading comments…</p>
-      ) : (
         <div className="space-y-3">
+          {[0, 1, 2].map((idx) => (
+            <div key={idx} className={cn('flex gap-2.5', idx > 0 && 'ml-5 sm:ml-8')}>
+              <div className="h-7 w-7 animate-pulse rounded-full bg-slate-200 dark:bg-slate-700" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3.5 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+                <div className="h-9 animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-700" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2.5 sm:space-y-3">
           {comments.map((c) => (
-            <CommentItem key={c.id} comment={c} onReply={(id, name) => { setReplyingTo({ id, name }); setText('') }} />
+            <CommentItem
+              key={c.id}
+              comment={c}
+              highlightedCommentId={highlightedCommentId}
+              onReply={(id, name) => {
+                setReplyingTo({ id, name })
+                setText('')
+                focusComposer()
+              }}
+            />
           ))}
         </div>
       )}
 
+      {typingUsers.length > 0 && (
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-cyan-200/80 bg-cyan-50 px-2.5 py-1 text-[11px] text-cyan-700 dark:border-cyan-800/80 dark:bg-cyan-900/20 dark:text-cyan-300">
+          <span className="inline-flex gap-1">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-500 [animation-delay:-160ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-500 [animation-delay:-80ms]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-cyan-500" />
+          </span>
+          <span>
+            {typingUsers.slice(0, 2).join(', ')} {typingUsers.length > 1 ? 'are' : 'is'} typing
+          </span>
+        </div>
+      )}
+
       {user && (
-        <form onSubmit={submit} className="mt-4 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800/90 sm:p-3.5">
+        <form onSubmit={submit} className="mt-4">
           {replyingTo && (
             <div className="mb-2 flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1.5 text-xs text-slate-500 dark:bg-slate-700/50">
               <Reply size={12} className="text-violet-500" />
@@ -535,22 +733,113 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
               </button>
             </div>
           )}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={replyingTo ? `Reply to ${replyingTo.name}…` : 'Write a comment…'}
-              rows={2}
-              className="min-h-[68px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-violet-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-            />
+          <AnimatePresence>
+            {(mobileInputFocused || keyboardOpen) && (
+              <motion.div
+                key="mobile-comment-composer"
+                initial={{ opacity: 0, y: 22, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 16, scale: 0.985 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                className={cn(
+                  'fixed left-3 right-3 z-[49] rounded-2xl border border-slate-300/90 bg-white/95 px-2.5 py-2 shadow-[0_14px_34px_rgba(15,23,42,0.14)] backdrop-blur dark:border-slate-600 dark:bg-slate-800/95 md:hidden',
+                  'bottom-[calc(var(--mobile-nav-height)+0.3rem)]'
+                )}
+              >
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 dark:border-slate-600 dark:bg-slate-700">
+                    <textarea
+                      ref={mobileInputRef}
+                      value={text}
+                      onChange={(e) => handleTypingChange(e.target.value)}
+                      onFocus={() => {
+                        setMobileInputFocused(true)
+                        text.trim() && broadcastTyping(true)
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setMobileInputFocused(false), 120)
+                        broadcastTyping(false)
+                      }}
+                      placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : 'Add to the conversation...'}
+                      rows={1}
+                      className="max-h-[120px] min-h-[38px] w-full resize-none bg-transparent px-1.5 py-1 text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
+                    />
+                    <div className="mt-1.5 flex items-center gap-1 text-slate-400">
+                      <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white hover:text-cyan-600 dark:hover:bg-slate-600" aria-label="Mention user">
+                        <AtSign size={16} />
+                      </button>
+                      <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white hover:text-cyan-600 dark:hover:bg-slate-600" aria-label="Add hashtag">
+                        <Hash size={16} />
+                      </button>
+                      <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white hover:text-cyan-600 dark:hover:bg-slate-600" aria-label="Attach image">
+                        <ImagePlus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!text.trim()}
+                    aria-label={replyingTo ? 'Send reply' : 'Send comment'}
+                    className="mb-[2px] flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 text-white shadow-[0_8px_18px_rgba(124,58,237,0.35)] transition hover:bg-violet-700 disabled:opacity-40"
+                  >
+                    <SendHorizontal size={16} />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {!(mobileInputFocused || keyboardOpen) && (
             <button
-              type="submit"
-              disabled={!text.trim()}
-              className="w-full rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-40 sm:w-auto"
+              type="button"
+              onClick={() => {
+                setMobileInputFocused(true)
+                setTimeout(() => mobileInputRef.current?.focus(), 10)
+              }}
+              className="fixed left-3 right-3 z-[49] flex h-11 items-center justify-between rounded-2xl border border-slate-300/90 bg-white/95 px-3 text-sm text-slate-500 shadow-[0_8px_22px_rgba(15,23,42,0.12)] backdrop-blur dark:border-slate-600 dark:bg-slate-800/95 dark:text-slate-300 md:hidden"
+              style={{ bottom: 'calc(var(--mobile-nav-height) + 0.3rem)' }}
+              aria-label="Open comment composer"
             >
-              {replyingTo ? 'Reply' : 'Post'}
+              <span>{replyingTo ? `Reply to @${replyingTo.name}` : 'Add a comment...'}</span>
+              <SendHorizontal size={16} className="text-violet-600" />
             </button>
+          )}
+
+          <div className="hidden items-end gap-2 md:flex">
+            <Avatar src={user.avatar_url} name={user.full_name} size="sm" />
+            <div className="flex-1 rounded-2xl border border-slate-200/80 bg-white/95 p-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
+              <textarea
+                ref={desktopInputRef}
+                value={text}
+                onChange={(e) => handleTypingChange(e.target.value)}
+                onFocus={() => text.trim() && broadcastTyping(true)}
+                onBlur={() => broadcastTyping(false)}
+                placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : 'Write a thoughtful comment...'}
+                rows={2}
+                className="max-h-[210px] min-h-[42px] w-full resize-none bg-transparent px-2 py-1 text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-white"
+              />
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-slate-100 hover:text-cyan-600 dark:hover:bg-slate-700" aria-label="Mention user">
+                    <AtSign size={14} />
+                  </button>
+                  <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-slate-100 hover:text-cyan-600 dark:hover:bg-slate-700" aria-label="Add hashtag">
+                    <Hash size={14} />
+                  </button>
+                  <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-slate-100 hover:text-cyan-600 dark:hover:bg-slate-700" aria-label="Attach image">
+                    <ImagePlus size={14} />
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!text.trim()}
+                  aria-label={replyingTo ? 'Send reply' : 'Send comment'}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 text-white shadow-[0_8px_18px_rgba(124,58,237,0.35)] transition hover:bg-violet-700 disabled:opacity-40"
+                >
+                  <SendHorizontal size={16} />
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       )}
@@ -558,35 +847,79 @@ function CommentSection({ postId, onCommentAdded }: { postId: string; onCommentA
   )
 }
 
-function CommentItem({ comment, onReply, depth = 0 }: {
+function CommentItem({ comment, onReply, depth = 0, highlightedCommentId }: {
   comment: CommentRow
   onReply: (id: string, username: string) => void
   depth?: number
+  highlightedCommentId?: string | null
 }) {
+  const [collapsed, setCollapsed] = useState(false)
+  const [showAllReplies, setShowAllReplies] = useState(false)
+  const [highlightPulse, setHighlightPulse] = useState(comment.id === highlightedCommentId)
+  const replies = comment.replies ?? []
+  const visibleReplies = showAllReplies ? replies : replies.slice(0, 2)
+  const hiddenReplyCount = Math.max(0, replies.length - visibleReplies.length)
+  const indentDepth = Math.min(depth, 2)
+
+  useEffect(() => {
+    if (comment.id !== highlightedCommentId) return
+    setHighlightPulse(true)
+    const timeout = setTimeout(() => setHighlightPulse(false), 2600)
+    return () => clearTimeout(timeout)
+  }, [comment.id, highlightedCommentId])
+
   return (
-    <div className={cn('flex items-start gap-2.5', depth > 0 && 'ml-4 mt-2 border-l border-slate-200 pl-3 dark:border-slate-700 sm:ml-8')}>
+    <div
+      className={cn('flex items-start gap-2 sm:gap-2.5', depth > 0 && 'mt-1.5 sm:mt-2')}
+      style={{ marginLeft: depth > 0 ? `${8 + indentDepth * 12}px` : 0 }}
+    >
       <Avatar src={comment.author.avatar_url} name={comment.author.full_name} size="sm" />
       <div className="flex-1 min-w-0">
-        <div className="rounded-2xl border border-slate-200/80 bg-white/95 px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800/90">
-          <p className="text-xs font-semibold text-slate-800 dark:text-white">{comment.author.full_name}</p>
-          <p className="mt-1 break-words text-sm leading-6 text-slate-700 dark:text-slate-200">{comment.content}</p>
+        <div className={cn(
+          'rounded-2xl border border-slate-200/80 bg-white/95 px-2.5 py-1.5 shadow-sm transition dark:border-slate-700 dark:bg-slate-800/90 sm:px-3 sm:py-2',
+          depth > 0 && 'relative before:absolute before:-left-3 before:top-2 before:h-[calc(100%-8px)] before:w-px before:bg-slate-200 dark:before:bg-slate-700',
+          highlightPulse && 'ring-2 ring-cyan-300/70 dark:ring-cyan-700/70'
+        )}>
+          <p className="text-[11px] font-semibold text-slate-800 dark:text-white sm:text-xs">{comment.author.full_name}</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">@{comment.author.username} · {timeAgo(comment.created_at)}</p>
+          <p className="mt-1 break-words text-[13px] leading-5 text-slate-700 dark:text-slate-200 sm:text-sm sm:leading-6">{comment.content}</p>
         </div>
-        <div className="ml-1 mt-1 flex items-center gap-3">
-          <span className="text-[10px] text-slate-400">{timeAgo(comment.created_at)}</span>
-          {depth === 0 && (
+        <div className="ml-1 mt-0.5 flex items-center gap-2.5 sm:mt-1 sm:gap-3">
+          <button
+            onClick={() => onReply(comment.id, comment.author.username)}
+            className="flex items-center gap-1 text-[10px] text-slate-400 transition hover:text-violet-600"
+          >
+            <Reply size={11} /> Reply
+          </button>
+          {replies.length > 0 && (
             <button
-              onClick={() => onReply(comment.id, comment.author.username)}
-              className="flex items-center gap-1 text-[10px] text-slate-400 transition hover:text-violet-600"
+              onClick={() => setCollapsed((v) => !v)}
+              className="flex items-center gap-1 text-[10px] text-slate-400 transition hover:text-slate-600"
             >
-              <Reply size={11} /> Reply
+              {collapsed ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+              {collapsed ? 'Expand thread' : 'Collapse thread'}
             </button>
           )}
         </div>
-        {comment.replies && comment.replies.length > 0 && (
-          <div className="space-y-2 mt-1">
-            {comment.replies.map((r) => (
-              <CommentItem key={r.id} comment={r} onReply={onReply} depth={depth + 1} />
+        {!collapsed && replies.length > 0 && (
+          <div className="mt-0.5 space-y-1.5 sm:mt-1 sm:space-y-2">
+            {visibleReplies.map((r) => (
+              <CommentItem
+                key={r.id}
+                comment={r}
+                onReply={onReply}
+                depth={depth + 1}
+                highlightedCommentId={highlightedCommentId}
+              />
             ))}
+            {hiddenReplyCount > 0 && (
+              <button
+                onClick={() => setShowAllReplies(true)}
+                className="ml-1 rounded-lg px-2 py-1 text-[11px] text-cyan-700 transition hover:bg-cyan-50 dark:text-cyan-300 dark:hover:bg-cyan-900/20"
+              >
+                View {hiddenReplyCount} more {hiddenReplyCount === 1 ? 'reply' : 'replies'}
+              </button>
+            )}
           </div>
         )}
       </div>

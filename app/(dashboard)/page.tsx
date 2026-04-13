@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { SuggestedUsers } from '@/components/social/SuggestedUsers'
 import { TrendingTopics } from '@/components/social/TrendingTopics'
 import { LayoutGrid, Loader2, Users, Bookmark, Megaphone, ChevronsDown } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useUser } from '@/lib/hooks/useUser'
 import type { PostWithAuthor } from '@/types/app'
 import { useState, useEffect, useCallback, useRef, Component, type ErrorInfo, type ReactNode } from 'react'
@@ -25,6 +26,12 @@ const EMPTY_STATE: Record<FeedMode, { title: string; description: string }> = {
   all: { title: 'Nothing here yet', description: 'Be the first to post something for the COSSA community!' },
   following: { title: 'No posts yet', description: 'Follow people from the "Who to follow" section to see their posts here.' },
   saved: { title: 'No saved posts', description: 'Tap the bookmark icon on any post to save it here for later.' },
+}
+
+type NewPostAuthor = {
+  id: string
+  full_name: string
+  avatar_url: string | null
 }
 
 type FeedRouteErrorBoundaryProps = {
@@ -111,6 +118,7 @@ function FeedPageContent() {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useFeed(mode)
   const [localPosts, setLocalPosts] = useState<PostWithAuthor[]>([])
   const [newCount, setNewCount] = useState(0)
+  const [newAuthors, setNewAuthors] = useState<NewPostAuthor[]>([])
   const loaderRef = useRef<HTMLDivElement>(null)
   const feedTopRef = useRef<HTMLDivElement>(null)
 
@@ -186,8 +194,22 @@ function FeedPageContent() {
         { event: 'INSERT', schema: 'public', table: 'posts' },
         async (payload) => {
           const id = (payload.new as { id: string }).id
+          const authorId = (payload.new as { author_id: string }).author_id
           if (knownIds.has(id)) return
-          if (user && (payload.new as { author_id: string }).author_id === user.id) return
+          if (user && authorId === user.id) return
+
+          if (authorId) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('id, full_name, avatar_url')
+              .eq('id', authorId)
+              .maybeSingle()
+
+            if (profile) {
+              const resolved = profile as NewPostAuthor
+              setNewAuthors((prev) => [resolved, ...prev.filter((a) => a.id !== resolved.id)].slice(0, 3))
+            }
+          }
           setNewCount((c) => c + 1)
         },
       )
@@ -201,10 +223,12 @@ function FeedPageContent() {
   useEffect(() => {
     setLocalPosts([])
     setNewCount(0)
+    setNewAuthors([])
   }, [mode])
 
   function loadNewPosts() {
     setNewCount(0)
+    setNewAuthors([])
     setLocalPosts([])
     qc.invalidateQueries({ queryKey: ['feed', mode] })
     feedTopRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -212,6 +236,37 @@ function FeedPageContent() {
 
   return (
     <div className="mx-auto max-w-6xl px-3 pt-4 pb-[calc(var(--mobile-nav-height)+1rem)] sm:px-4 sm:pt-6 sm:pb-[calc(var(--mobile-nav-height)+1.5rem)] md:pb-6">
+      <AnimatePresence>
+        {newCount > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: -12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            onClick={loadNewPosts}
+            className="fixed left-1/2 top-[4.6rem] z-30 inline-flex -translate-x-1/2 items-center gap-2 rounded-full border border-cyan-300/70 bg-white/88 px-3.5 py-2 text-sm font-semibold text-cyan-700 shadow-[0_14px_30px_rgba(8,145,178,0.22)] backdrop-blur hover:bg-white dark:border-cyan-700/60 dark:bg-slate-900/88 dark:text-cyan-300 md:top-[4.9rem]"
+          >
+            {newAuthors.length > 0 && (
+              <div className="flex items-center">
+                {newAuthors.map((author, index) => (
+                  <div key={author.id} className={cn('relative h-6 w-6 overflow-hidden rounded-full border-2 border-white dark:border-slate-900', index > 0 && '-ml-2')}>
+                    {author.avatar_url ? (
+                      <img src={author.avatar_url} alt={author.full_name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-cyan-100 text-[10px] font-semibold text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200">
+                        {author.full_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <span>{newCount} new post{newCount === 1 ? '' : 's'}</span>
+            <ChevronsDown size={15} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         {/* Main feed column */}
         <div className="min-w-0 space-y-5" ref={feedTopRef}>
@@ -221,23 +276,6 @@ function FeedPageContent() {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-600/80 dark:text-cyan-300/80">Campus Feed</p>
               </div>
-
-              <button
-                onClick={loadNewPosts}
-                disabled={newCount === 0}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition',
-                  newCount > 0
-                    ? 'border-cyan-300/80 bg-[linear-gradient(135deg,#0f172a,#1d4ed8)] text-white shadow-[0_14px_32px_rgba(30,64,175,0.26)] hover:translate-y-[-1px] hover:shadow-[0_18px_36px_rgba(30,64,175,0.3)]'
-                    : 'border-slate-200/80 bg-white/80 text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400',
-                )}
-              >
-                <ChevronsDown size={16} />
-                New posts
-                <span className={cn('rounded-full px-2 py-0.5 text-xs', newCount > 0 ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300')}>
-                  {newCount}
-                </span>
-              </button>
             </div>
 
             <div className="mt-4 flex gap-1.5 overflow-x-auto rounded-2xl bg-slate-950/5 p-1.5 dark:bg-white/5">
@@ -297,6 +335,11 @@ function FeedPageContent() {
             </div>
           )}
 
+          {/* People discovery for mobile */}
+          <section className="xl:hidden md:hidden">
+            <SuggestedUsers />
+          </section>
+
           {/* Feed */}
           {isLoading ? (
             <FeedSkeleton />
@@ -308,12 +351,22 @@ function FeedPageContent() {
             />
           ) : (
             <div className="space-y-4">
-              {feed.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  onDeleted={(id) => setLocalPosts((prev) => prev.filter((p) => p.id !== id))}
-                />
+              {feed.map((post, index) => (
+                <div key={post.id} className="space-y-4">
+                  <PostCard
+                    post={post}
+                    onDeleted={(id) => setLocalPosts((prev) => prev.filter((p) => p.id !== id))}
+                  />
+                  {index === 2 && (
+                    <section className="hidden md:block xl:hidden">
+                      <div className="subtle-scrollbar overflow-x-auto">
+                        <div className="min-w-[23rem] max-w-[28rem]">
+                          <SuggestedUsers />
+                        </div>
+                      </div>
+                    </section>
+                  )}
+                </div>
               ))}
               <div ref={loaderRef} className="flex justify-center py-4">
                 {isFetchingNextPage && <Loader2 size={20} className="animate-spin text-violet-600" />}
