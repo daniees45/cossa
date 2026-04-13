@@ -77,6 +77,8 @@ export function Topbar() {
     setOpen(false)
     setSearchOpen(false)
     setUserMenuOpen(false)
+    const main = document.getElementById('dashboard-main')
+    main?.focus({ preventScroll: true })
   }, [pathname])
 
   async function handleMarkAllRead() {
@@ -103,7 +105,7 @@ export function Topbar() {
         <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
           <span className="text-white font-bold text-xs">C</span>
         </div>
-        <span className="max-w-20 truncate text-sm font-bold text-slate-900 dark:text-white min-[370px]:max-w-none">COSSA</span>
+        <span className="max-w-20 truncate text-sm font-bold leading-normal text-slate-900 dark:text-white min-[370px]:max-w-none">COSSA</span>
       </div>
 
       {/* Search */}
@@ -112,7 +114,7 @@ export function Topbar() {
         className="flex-1 max-w-xs hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-3 py-2 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition"
       >
         <Search size={15} className="text-slate-400 shrink-0" />
-        <span className="text-sm text-slate-400 flex-1">Search…</span>
+        <span className="text-sm leading-normal text-slate-400 flex-1">Search…</span>
         <kbd className="hidden lg:inline text-[10px] text-slate-400 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">⌘K</kbd>
       </div>
 
@@ -121,6 +123,7 @@ export function Topbar() {
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2.5">
         <button
           onClick={() => setSearchOpen(true)}
+          aria-label="Open search"
           className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden"
           title="Search"
         >
@@ -132,6 +135,7 @@ export function Topbar() {
         <div className="relative" ref={ref}>
           <button
             onClick={() => setOpen(!open)}
+            aria-label={open ? 'Close notifications' : 'Open notifications'}
             className="relative p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
             <Bell size={20} className="text-slate-600 dark:text-slate-300" />
@@ -176,7 +180,7 @@ export function Topbar() {
                     <div className="w-2 h-2 rounded-full bg-violet-500 mt-2 shrink-0 opacity-0 data-[unread=true]:opacity-100" data-unread={!n.read} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900 dark:text-white">{n.title}</p>
-                      <p className="text-xs text-slate-500 mt-0.5 truncate">{n.body}</p>
+                      <p className="text-xs leading-normal text-slate-500 mt-0.5 truncate">{n.body}</p>
                       <p className="text-xs text-slate-400 mt-1">{timeAgo(n.created_at)}</p>
                     </div>
                   </div>
@@ -191,6 +195,7 @@ export function Topbar() {
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setUserMenuOpen((v) => !v)}
+              aria-label={userMenuOpen ? 'Close account menu' : 'Open account menu'}
               className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-violet-600 text-xs font-bold text-white ring-2 ring-transparent transition hover:ring-violet-300"
               title="Account menu"
             >
@@ -202,8 +207,8 @@ export function Topbar() {
             {userMenuOpen && (
               <div className="absolute right-0 top-11 z-50 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
                 <div className="border-b border-slate-100 px-3 py-2.5 dark:border-slate-700">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{user.full_name}</p>
-                  <p className="truncate text-xs text-slate-400">@{user.username}</p>
+                  <p className="truncate text-sm leading-normal font-semibold text-slate-900 dark:text-white">{user.full_name}</p>
+                  <p className="truncate text-xs leading-normal text-slate-400">@{user.username}</p>
                 </div>
 
                 <div className="p-1.5">
@@ -245,6 +250,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+      aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
       className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
       title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >

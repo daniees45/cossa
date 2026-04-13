@@ -44,7 +44,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white px-3 py-6 dark:border-slate-800 dark:bg-slate-900 md:flex">
+    <aside className="subtle-scrollbar sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto [scrollbar-gutter:stable] border-r border-slate-200 bg-white px-3 py-6 dark:border-slate-800 dark:bg-slate-900 md:flex">
       {/* Logo */}
       <div className="flex items-center gap-3 px-3 mb-8">
         <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
@@ -52,18 +52,19 @@ export function Sidebar() {
         </div>
         <div>
           <p className="font-bold text-slate-900 dark:text-white text-sm leading-none">COSSA</p>
-          <p className="text-slate-400 text-xs mt-0.5">VVU CS Assoc.</p>
+          <p className="text-slate-400 text-xs mt-0.5 leading-normal">VVU CS Assoc.</p>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 pr-1">
+      <nav className="flex-1 space-y-0.5 pr-1" aria-label="Primary navigation">
         {NAV.map(({ label, href, icon: Icon }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
             <Link
               key={href}
               href={href}
+              aria-current={active ? 'page' : undefined}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors group',
                 active
@@ -97,7 +98,7 @@ export function Sidebar() {
         )}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 transition"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-600 dark:text-slate-300 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-300 transition"
         >
           <LogOut size={18} />
           Sign out
@@ -110,8 +111,8 @@ export function Sidebar() {
                 : getInitials(user.full_name)}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{user.full_name}</p>
-              <p className="text-xs text-slate-400 truncate">@{user.username}</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white truncate leading-normal">{user.full_name}</p>
+              <p className="text-xs text-slate-400 truncate leading-normal">@{user.username}</p>
             </div>
           </Link>
         )}

@@ -211,7 +211,7 @@ function FeedPageContent() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6">
+    <div className="mx-auto max-w-6xl px-3 pt-4 pb-[calc(var(--mobile-nav-height)+1rem)] sm:px-4 sm:pt-6 sm:pb-[calc(var(--mobile-nav-height)+1.5rem)] md:pb-6">
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
         {/* Main feed column */}
         <div className="min-w-0 space-y-5" ref={feedTopRef}>
