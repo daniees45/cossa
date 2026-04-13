@@ -1,14 +1,12 @@
 'use client'
 import Link from 'next/link'
-import { Bell, Search, Sun, Moon, LogOut, User, Settings, X, MessageSquare, Megaphone, CheckCircle2, AlertTriangle, BellOff } from 'lucide-react'
+import { Bell, Search, Sun, Moon, LogOut, User, Settings, X, MessageSquare, Megaphone, CheckCircle2, AlertTriangle, BellOff, Loader2 } from 'lucide-react'
 import { useTheme } from '@/lib/context/ThemeProvider'
-import { SearchModal } from '@/components/shared/SearchModal'
 import { useNotificationStore } from '@/lib/stores/notificationStore'
 import { useUser } from '@/lib/hooks/useUser'
 import { getInitials } from '@/lib/utils/uploadFile'
 import { cn } from '@/lib/utils/cn'
 import { useState, useEffect, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, usePathname } from 'next/navigation'
 import { timeAgo } from '@/lib/utils/formatDate'
@@ -28,21 +26,24 @@ export function Topbar() {
   const { unreadCount, notifications, markAllRead, markOneRead, setNotifications } = useNotificationStore()
   const { user } = useUser()
   const [open, setOpen] = useState(false)
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchingInline, setSearchingInline] = useState(false)
   const [notificationsLoading, setNotificationsLoading] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [showMobileHelper, setShowMobileHelper] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const pathname = usePathname()
 
-  // Cmd+K / Ctrl+K shortcut to open search
+  // Cmd+K / Ctrl+K shortcut to focus inline search
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setSearchOpen(true)
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
       }
     }
     document.addEventListener('keydown', onKey)
@@ -91,7 +92,6 @@ export function Topbar() {
   // Always dismiss overlays when navigating to another page.
   useEffect(() => {
     setOpen(false)
-    setSearchOpen(false)
     setUserMenuOpen(false)
     const main = document.getElementById('dashboard-main')
     main?.focus({ preventScroll: true })
@@ -171,91 +171,133 @@ export function Topbar() {
     setNotifications(notifications.filter((n) => n.id !== id))
   }
 
+  async function handleInlineSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const term = searchQuery.trim()
+    if (term.length < 2 || searchingInline) return
+
+    setSearchingInline(true)
+    try {
+      const supabase = createClient()
+      const like = `%${term}%`
+      const [{ data: users }, { data: posts }] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('username')
+          .or(`full_name.ilike.${like},username.ilike.${like}`)
+          .limit(1),
+        supabase
+          .from('posts')
+          .select('id')
+          .ilike('content', like)
+          .order('created_at', { ascending: false })
+          .limit(1),
+      ])
+
+      const topUser = users?.[0] as { username?: string } | undefined
+      const topPost = posts?.[0] as { id?: string } | undefined
+
+      if (topUser?.username) {
+        router.push(`/profile/${topUser.username}`)
+        return
+      }
+
+      if (topPost?.id) {
+        router.push(`/social/${topPost.id}`)
+        return
+      }
+
+      router.push('/people')
+    } finally {
+      setSearchingInline(false)
+    }
+  }
+
   return (
-    <header className="relative sticky top-0 z-40 flex h-14 min-w-0 items-center gap-2 border-b border-slate-200/90 bg-white/90 px-3 shadow-[0_2px_10px_rgba(15,23,42,0.04)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/88 sm:gap-3 sm:px-4 md:px-6">
+    <header className="relative sticky top-0 z-40 flex h-14 min-w-0 items-center gap-1.5 border-b border-slate-200/90 bg-white/90 px-2 shadow-[0_2px_10px_rgba(15,23,42,0.04)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/88 min-[370px]:gap-2 min-[370px]:px-3 sm:gap-3 sm:px-4 md:px-6">
       {/* COSSA logo - mobile only */}
-      <div className="mr-0.5 flex min-w-0 items-center gap-2 md:hidden sm:mr-1">
+      <div className="mr-0.5 flex min-w-0 items-center gap-1.5 md:hidden sm:mr-1 sm:gap-2">
         <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
           <span className="text-white font-bold text-xs">C</span>
         </div>
-        <span className="max-w-20 truncate text-sm font-bold leading-normal text-slate-900 dark:text-white min-[370px]:max-w-none">COSSA</span>
+        <span className="hidden max-w-20 truncate text-sm font-bold leading-normal text-slate-900 dark:text-white min-[340px]:inline min-[370px]:max-w-none">COSSA</span>
       </div>
+
+      {/* Mobile inline search */}
+      <form
+        onSubmit={handleInlineSearchSubmit}
+        className="mr-0.5 flex min-w-0 basis-0 flex-1 items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/85 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 focus-within:border-violet-300/90 focus-within:ring-2 focus-within:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-800/80 min-[370px]:mr-1 min-[370px]:gap-2 min-[370px]:px-2.5 md:hidden"
+        aria-label="Inline search"
+      >
+        <span className="relative h-4 w-4 shrink-0 text-violet-500">
+          {searchingInline ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+        </span>
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search"
+          aria-label="Search people or posts"
+          className="min-w-[11ch] flex-1 bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-500 dark:text-slate-200 dark:placeholder:text-slate-400"
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="rounded-md p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+            aria-label="Clear search"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </form>
 
       {/* Search */}
       <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden w-[min(40rem,calc(100%-22rem))] -translate-x-1/2 -translate-y-1/2 md:block lg:w-[min(44rem,calc(100%-24rem))]">
-        <div
-          onClick={() => setSearchOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              setSearchOpen(true)
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          className={cn(
-            'pointer-events-auto flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/70 px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/40',
-            searchOpen
-              ? 'scale-[1.01] border-violet-300/90 ring-2 ring-violet-500/20 shadow-[0_12px_30px_rgba(124,58,237,0.12),inset_0_1px_0_rgba(255,255,255,0.75)] dark:border-violet-700/80 dark:bg-slate-800/80'
-              : 'hover:border-slate-300 hover:bg-white/90 dark:border-slate-700 dark:bg-slate-800/65 dark:hover:bg-slate-800/85'
-          )}
-          aria-label="Open search"
+        <form
+          onSubmit={handleInlineSearchSubmit}
+          className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/80 px-3.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] backdrop-blur-md transition duration-200 focus-within:border-violet-300/90 focus-within:ring-2 focus-within:ring-violet-500/20 dark:border-slate-700 dark:bg-slate-800/75"
+          aria-label="Inline search"
         >
           <span className="relative h-4 w-4 shrink-0 text-violet-500">
-            <AnimatePresence mode="wait" initial={false}>
-              {searchOpen ? (
-                <motion.span
-                  key="close"
-                  initial={{ opacity: 0, rotate: -35, scale: 0.7 }}
-                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                  exit={{ opacity: 0, rotate: 35, scale: 0.7 }}
-                  transition={{ duration: 0.16 }}
-                  className="absolute inset-0"
-                >
-                  <X size={15} />
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="search"
-                  initial={{ opacity: 0, rotate: 35, scale: 0.7 }}
-                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                  exit={{ opacity: 0, rotate: -35, scale: 0.7 }}
-                  transition={{ duration: 0.16 }}
-                  className="absolute inset-0"
-                >
-                  <Search size={15} />
-                </motion.span>
-              )}
-            </AnimatePresence>
+            {searchingInline ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
           </span>
-          <span className="flex-1 text-sm font-medium leading-normal text-slate-600 dark:text-slate-300">Search people, posts, or jump anywhere</span>
+          <input
+            ref={searchInputRef}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search people or posts"
+            aria-label="Search people or posts"
+            className="min-w-0 flex-1 bg-transparent text-sm font-medium leading-normal text-slate-700 outline-none placeholder:text-slate-500 dark:text-slate-200 dark:placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+              aria-label="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
           <kbd className="hidden rounded-full border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.9))] px-2 py-1 text-[10px] font-semibold tracking-[0.08em] text-slate-500 shadow-sm dark:border-slate-600 dark:bg-[linear-gradient(180deg,rgba(51,65,85,0.95),rgba(30,41,59,0.9))] dark:text-slate-300 lg:inline">
             ⌘K
           </kbd>
-        </div>
+        </form>
       </div>
 
-      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
-
-      <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-        <button
-          onClick={() => setSearchOpen(true)}
-          aria-label="Open search"
-          className="rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 sm:hidden"
-          title="Search"
-        >
-          <Search size={18} />
-        </button>
+      <div className="ml-auto flex shrink-0 items-center gap-1 min-[370px]:gap-1.5 sm:gap-2.5">
         {/* Dark mode toggle */}
-        <ThemeToggle />
+        <div className="max-[329px]:hidden">
+          <ThemeToggle />
+        </div>
         {/* Notification Bell */}
         <div className="relative" ref={ref}>
           <button
             onClick={() => setOpen(!open)}
             aria-label={open ? 'Close notifications' : 'Open notifications'}
-            className="relative rounded-xl p-2.5 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="relative rounded-xl p-1.5 transition hover:bg-slate-100 min-[370px]:p-2 dark:hover:bg-slate-800 sm:p-2.5"
           >
-            <Bell size={20} className="text-slate-600 dark:text-slate-300" />
+            <Bell size={18} className="text-slate-600 dark:text-slate-300 sm:h-5 sm:w-5" />
             {unreadCount > 0 && (
               <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold">
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -357,7 +399,7 @@ export function Topbar() {
           )}
         </div>
 
-        <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+        <div className="hidden h-6 w-px bg-slate-200 dark:bg-slate-700 min-[340px]:block" aria-hidden="true" />
 
         {/* Avatar */}
         {user && (
@@ -365,7 +407,7 @@ export function Topbar() {
             <button
               onClick={() => setUserMenuOpen((v) => !v)}
               aria-label={userMenuOpen ? 'Close account menu' : 'Open account menu'}
-              className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-violet-600 text-xs font-bold text-white ring-2 ring-transparent transition hover:ring-violet-300"
+              className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-violet-600 text-xs font-bold text-white ring-2 ring-transparent transition hover:ring-violet-300 sm:h-8 sm:w-8"
               title="Account menu"
             >
               {user.avatar_url
@@ -442,10 +484,10 @@ function ThemeToggle() {
     <button
       onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
       aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="rounded-xl p-2.5 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+      className="rounded-xl p-1.5 text-slate-500 transition hover:bg-slate-100 min-[370px]:p-2 dark:text-slate-400 dark:hover:bg-slate-800 sm:p-2.5"
       title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+      {resolvedTheme === 'dark' ? <Sun size={17} className="sm:h-[18px] sm:w-[18px]" /> : <Moon size={17} className="sm:h-[18px] sm:w-[18px]" />}
     </button>
   )
 }

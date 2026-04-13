@@ -59,8 +59,14 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
       setQuery('')
       setResults({ users: [], posts: [] })
       setFocused(true)
-      setTimeout(() => inputRef.current?.focus(), 50)
+      const first = window.setTimeout(() => inputRef.current?.focus(), 30)
+      const second = window.setTimeout(() => inputRef.current?.focus(), 140)
       document.body.style.overflow = 'hidden'
+      return () => {
+        window.clearTimeout(first)
+        window.clearTimeout(second)
+        document.body.style.overflow = ''
+      }
     } else {
       document.body.style.overflow = ''
       setFocused(false)
@@ -194,7 +200,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
     <AnimatePresence>
       {open && (
     <motion.div
-      className="fixed inset-0 z-[120] flex items-end justify-center px-0 pb-0 pt-0 sm:items-center sm:px-4 sm:pb-0 sm:pt-0"
+      className="fixed inset-0 z-[120] flex items-center justify-center px-3 py-4 sm:px-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -209,7 +215,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.97, y: 8 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="relative flex h-dvh w-full flex-col overflow-hidden border border-slate-200/80 bg-white/96 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/96 sm:h-auto sm:max-h-[74dvh] sm:max-w-2xl sm:rounded-[1.75rem]"
+        className="relative flex h-[min(84dvh,44rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[1.4rem] border border-slate-200/80 bg-white/96 shadow-2xl backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/96 sm:rounded-[1.75rem]"
       >
         {/* Input */}
         <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-700 sm:px-5">
